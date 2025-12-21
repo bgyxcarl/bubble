@@ -1,10 +1,7 @@
 import { Transaction, TxType } from '../types';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-const API_KEY = process.env.API_KEY;
 const BASE_URL = 'https://api.etherscan.io/v2/api';
+const ETH_API_KEY = process.env.API_KEY;
 
 // Using a Rotating Key strategy or standard key for Tron
 const TRON_API_KEY = process.env.TRON_API_KEY;
@@ -371,7 +368,7 @@ export const fetchAddressHistory = async (address: string, chainId: string = '1'
                 page: '1',
                 offset: '1000',
                 sort: 'desc',
-                apikey: API_KEY
+                apikey: ETH_API_KEY
             });
             // Ensure startblock and endblock are present for better compatibility with Etherscan-like APIs
             params.append('startblock', '0');
