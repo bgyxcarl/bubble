@@ -750,56 +750,56 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
 
   // Selected Stats
   const selectedStats = useMemo(() => {
-      if (!selectedNode) return null;
-      const txs = data.filter(t => t.type === activeType).filter(t => t.from === selectedNode.id || t.to === selectedNode.id);
-      const sentTxs = txs.filter(t => t.from === selectedNode.id);
-      const sentVal = sentTxs.reduce((acc, t) => acc + t.value, 0);
-      const receivedTxs = txs.filter(t => t.to === selectedNode.id);
-      const receivedVal = receivedTxs.reduce((acc, t) => acc + t.value, 0);
-      return { sentVal, receivedVal, totalCount: txs.length, history: txs.sort((a,b) => b.timestamp.localeCompare(a.timestamp)) };
+    if (!selectedNode) return null;
+    const txs = data.filter(t => t.type === activeType).filter(t => t.from === selectedNode.id || t.to === selectedNode.id);
+    const sentTxs = txs.filter(t => t.from === selectedNode.id);
+    const sentVal = sentTxs.reduce((acc, t) => acc + t.value, 0);
+    const receivedTxs = txs.filter(t => t.to === selectedNode.id);
+    const receivedVal = receivedTxs.reduce((acc, t) => acc + t.value, 0);
+    return { sentVal, receivedVal, totalCount: txs.length, history: txs.sort((a,b) => b.timestamp.localeCompare(a.timestamp)) };
   }, [selectedNode, data, activeType]);
 
   return (
-    <div ref={wrapperRef} className={`relative w-full h-full overflow-hidden font-sans select-none ${theme === 'light' ? 'bg-slate-50' : 'bg-[#111]'}`}>
-        <svg ref={svgRef} className="w-full h-full" />
-        
-        <div ref={tooltipRef} className="pointer-events-none fixed bg-black/90 text-white px-3 py-2 rounded text-xs font-mono font-bold z-50 border border-white/20 whitespace-nowrap shadow-xl backdrop-blur-sm opacity-0 transition-opacity duration-75" style={{ left: 0, top: 0 }} />
-        
-        <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 pointer-events-none">
-            <div className={`flex ${theme === 'light' ? 'bg-white/90 border-black' : 'bg-gray-900/90 border-white/50'} backdrop-blur border-2 neo-shadow-sm pointer-events-auto p-1 gap-1`}>
-                <button onClick={() => setActiveType('native')} className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-transparent transition-all ${activeType === 'native' ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-gray-800 text-gray-400')}`}>
-                    <Activity size={14} /> Transactions
-                </button>
-                <button onClick={() => setActiveType('erc20')} className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-transparent transition-all ${activeType === 'erc20' ? 'bg-blue-600 text-white border-blue-800' : (theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-gray-800 text-gray-400')}`}>
-                    <Coins size={14} /> Token Transfers
-                </button>
-            </div>
-            <div className={`px-3 py-1 text-[10px] font-mono border-2 self-start pointer-events-auto shadow-lg flex gap-3 ${theme === 'light' ? 'bg-black text-white border-white/20' : 'bg-white text-black border-black'}`}>
-                <span>NODES: {nodes.length}</span>
-                <span className="opacity-50">|</span>
-                <span>LINKS: {links.length}</span>
-                {baseAddresses.size > 0 && (<><span className="opacity-50">|</span><span className="text-red-500">BASE: {baseAddresses.size}</span></>)}
-            </div>
-        </div>
+    <div ref={wrapperRef} className={`relative w-full h-screen  overflow-hidden font-sans select-none ${theme === 'light' ? 'bg-slate-50' : 'bg-[#111]'}`}>
+      <svg ref={svgRef} className="w-full h-full" />
 
-        <div className="absolute top-4 right-4 z-30 flex gap-2">
-            <button 
-                onClick={() => setShowRelatedOnly(!showRelatedOnly)} 
-                className={`p-3 border-2 neo-shadow-hover transition-colors flex items-center gap-2 ${showRelatedOnly ? (theme === 'light' ? 'bg-red-500 text-white border-red-700' : 'bg-red-600 text-white border-red-400') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} 
-                title={showRelatedOnly ? "Exit Relationship View" : "Enter Cross-Address Relationship View"}
-            >
-                {showRelatedOnly ? <GitBranch size={18} /> : <Share2 size={18} />}
-            </button>
-            <button onClick={() => setShowTraceModal(true)} className={`p-3 border-2 neo-shadow-hover transition-colors flex items-center gap-2 ${showTraceModal ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Trace Next Hop">
-                <Waypoints size={18} />
-            </button>
-            <button onClick={() => setFiltersOpen(!filtersOpen)} className={`p-3 border-2 neo-shadow-hover transition-colors ${filtersOpen ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Filters">
-                <Filter size={18} />
-            </button>
-            <button onClick={() => setShowNodeList(!showNodeList)} className={`p-3 border-2 neo-shadow-hover transition-colors ${showNodeList ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Network Participants">
-                <List size={18} />
-            </button>
+      <div ref={tooltipRef} className="pointer-events-none fixed bg-black/90 text-white px-3 py-2 rounded text-xs font-mono font-bold z-50 border border-white/20 whitespace-nowrap shadow-xl backdrop-blur-sm opacity-0 transition-opacity duration-75" style={{ left: 0, top: 0 }} />
+        
+      <div className="absolute top-4 left-4 z-30 flex flex-col gap-2 pointer-events-none">
+        <div className={`flex ${theme === 'light' ? 'bg-white/90 border-black' : 'bg-gray-900/90 border-white/50'} backdrop-blur border-2 neo-shadow-sm pointer-events-auto p-1 gap-1`}>
+          <button onClick={() => setActiveType('native')} className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-transparent transition-all ${activeType === 'native' ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-gray-800 text-gray-400')}`}>
+              <Activity size={14} /> Transactions
+          </button>
+          <button onClick={() => setActiveType('erc20')} className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-transparent transition-all ${activeType === 'erc20' ? 'bg-blue-600 text-white border-blue-800' : (theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-gray-800 text-gray-400')}`}>
+              <Coins size={14} /> Token Transfers
+          </button>
         </div>
+        <div className={`px-3 py-1 text-[10px] font-mono border-2 self-start pointer-events-auto shadow-lg flex gap-3 ${theme === 'light' ? 'bg-black text-white border-white/20' : 'bg-white text-black border-black'}`}>
+          <span>NODES: {nodes.length}</span>
+          <span className="opacity-50">|</span>
+          <span>LINKS: {links.length}</span>
+          {baseAddresses.size > 0 && (<><span className="opacity-50">|</span><span className="text-red-500">BASE: {baseAddresses.size}</span></>)}
+        </div>
+      </div>
+
+      <div className="absolute top-4 right-4 z-30 flex gap-2">
+        <button 
+            onClick={() => setShowRelatedOnly(!showRelatedOnly)} 
+            className={`p-3 border-2 neo-shadow-hover transition-colors flex items-center gap-2 ${showRelatedOnly ? (theme === 'light' ? 'bg-red-500 text-white border-red-700' : 'bg-red-600 text-white border-red-400') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} 
+            title={showRelatedOnly ? "Exit Relationship View" : "Enter Cross-Address Relationship View"}
+        >
+          {showRelatedOnly ? <GitBranch size={18} /> : <Share2 size={18} />}
+        </button>
+        <button onClick={() => setShowTraceModal(true)} className={`p-3 border-2 neo-shadow-hover transition-colors flex items-center gap-2 ${showTraceModal ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Trace Next Hop">
+            <Waypoints size={18} />
+        </button>
+        <button onClick={() => setFiltersOpen(!filtersOpen)} className={`p-3 border-2 neo-shadow-hover transition-colors ${filtersOpen ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Filters">
+            <Filter size={18} />
+        </button>
+        <button onClick={() => setShowNodeList(!showNodeList)} className={`p-3 border-2 neo-shadow-hover transition-colors ${showNodeList ? (theme === 'light' ? 'bg-black text-white border-black' : 'bg-white text-black border-white') : (theme === 'light' ? 'bg-white text-black border-black' : 'bg-[#222] text-white border-white/20')}`} title="Network Participants">
+            <List size={18} />
+        </button>
+      </div>
 
         {/* --- TRACE MODAL --- */}
         <AnimatePresence>
