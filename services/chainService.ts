@@ -1,12 +1,10 @@
-
-
 import { Transaction, TxType } from '../types';
 
-const API_KEY = 'PX2PXQZNZRB1QF52XKT9PZY4ZPVRUTG5YA';
+const API_KEY = 'xx';
 const BASE_URL = 'https://api.etherscan.io/v2/api';
 
 // Using a Rotating Key strategy or standard key for Tron
-const TRON_API_KEY = '7b72de95-4dbf-41ad-b626-8361550705a8';
+const TRON_API_KEY = 'xxx';
 const TRON_HOST = 'https://apilist.tronscanapi.com/api';
 const CORS_PROXY = 'https://corsproxy.io/?';
 
