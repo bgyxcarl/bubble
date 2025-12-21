@@ -1,10 +1,13 @@
 import { Transaction, TxType } from '../types';
+import dotenv from 'dotenv';
 
-const API_KEY = 'xx';
+dotenv.config();
+
+const API_KEY = process.env.API_KEY;
 const BASE_URL = 'https://api.etherscan.io/v2/api';
 
 // Using a Rotating Key strategy or standard key for Tron
-const TRON_API_KEY = 'xxx';
+const TRON_API_KEY = process.env.TRON_API_KEY;
 const TRON_HOST = 'https://apilist.tronscanapi.com/api';
 const CORS_PROXY = 'https://corsproxy.io/?';
 
