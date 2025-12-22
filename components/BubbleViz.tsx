@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { Transaction, AddressNode, TxType } from '../types';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { Search, X, ArrowUpRight, ArrowDownLeft, Filter, List, Activity, Coins, CheckSquare, Square, Users, Zap, Check, Copy, Waypoints, Calendar, Loader2, Layers, Network, ChevronRight, MousePointer2, RefreshCcw, ShieldCheck, Target, ArrowRight, Share2, GitMerge, GitBranch } from 'lucide-react';
-import { fetchAddressHistory, SUPPORTED_CHAINS } from '../services/chainService';
+import { SUPPORTED_CHAINS } from '../services/chainService';
 
 const d3Any = d3 as any;
 const MotionDiv = motion.div as any;
@@ -441,8 +441,16 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
                   const batch = currentFrontier.slice(j, j + BATCH_SIZE);
                   
                   await Promise.allSettled(batch.map(async (address) => {
-                       const { data: resultData } = await fetchAddressHistory(address, traceConfig.network, range);
-                       const txs = resultData as Transaction[];
+                    // const { data: resultData } = await fetchAddressHistory(address, traceConfig.network, range);
+                    const response = await fetch('/api/address-history', {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ address: address, chainId: traceConfig.network, range }),
+                    });
+                    const resultData = await response.json();
+                    const txs = resultData as Transaction[];
 
                        txs.forEach((tx: Transaction) => {
                            if (tx.type === 'native' && !traceConfig.includeNative) return;

@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 
 // --- EXISTING ANALYSIS FUNCTION ---
 export const analyzeChainData = async (transactions: Transaction[], context: 'native' | 'erc20'): Promise<GeminiAnalysisResponse> => {

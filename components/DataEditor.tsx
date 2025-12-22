@@ -1,7 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Transaction, TxType } from '../types';
-import { normalizeCsvData } from '../services/geminiService';
-import { fetchAddressHistory, SUPPORTED_CHAINS } from '../services/chainService';
+import { SUPPORTED_CHAINS } from '../services/chainService';
 import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -292,7 +291,14 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         const snippet = lines.slice(0, 5).join('\n');
         
         try {
-            const mapping = await normalizeCsvData(snippet, importHint);
+            const response = await fetch('/api/normalize-csv', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ csvSnippet: snippet, userHint: importHint }),
+            });
+            const mapping = await response.json();
             const startIdx = mapping.hasHeader ? 1 : 0;
             let addedNative = 0;
             let addedErc20 = 0;
@@ -383,7 +389,14 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           let failCount = 0;
 
           for (const addr of addresses) {
-              const result = await fetchAddressHistory(addr, fetchChainId, dateRange);
+              const response = await fetch('/api/address-history', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ address: addr, chainId: fetchChainId, dateRange }),
+              });
+              const result = await response.json();
               
               if (result.error) {
                   console.warn(`Fetch failed for ${addr}:`, result.error);

@@ -1,14 +1,15 @@
+"use client"
 
 import React, { useState, useEffect } from 'react';
-import { Tab, Transaction, TxType } from './types';
-import { MOCK_DATA } from './constants';
-import DataEditor from './components/DataEditor';
-import BubbleViz from './components/BubbleViz';
-import AnalysisPanel from './components/AnalysisPanel';
+import { Tab, Transaction, TxType } from '../types';
+import { MOCK_DATA } from '../constants';
+import DataEditor from './DataEditor';
+import BubbleViz from './BubbleViz';
+import AnalysisPanel from './AnalysisPanel';
 import { LayoutGrid, Activity, BrainCircuit, Database, Sun, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const App: React.FC = () => {
+const RootApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DATA);
   const [activeType, setActiveType] = useState<TxType>('native');
   const [data, setData] = useState<Transaction[]>(MOCK_DATA);
@@ -171,5 +172,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
-    
+export default RootApp;

@@ -1,4 +1,5 @@
-import { Transaction, TxType } from '../types';
+import { NextRequest, NextResponse } from "next/server";
+import { Transaction } from "../../../types";
 
 const BASE_URL = 'https://api.etherscan.io/v2/api';
 const ETH_API_KEY = process.env.ETH_API_KEY;
@@ -28,7 +29,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     { name: 'Optimism Sepolia', id: '11155420', currency: 'ETH' },
     { name: 'Base Mainnet', id: '8453', currency: 'ETH' },
     { name: 'Base Sepolia', id: '84532', currency: 'ETH' },
-    { name: 'BSC Mainnet', id: '56', currency: 'BNB' }, 
+    { name: 'BSC Mainnet', id: '56', currency: 'BNB' },
     { name: 'Blast Mainnet', id: '81457', currency: 'ETH' },
     { name: 'Blast Sepolia', id: '168587773', currency: 'ETH' },
     { name: 'Linea Mainnet', id: '59144', currency: 'ETH' },
@@ -63,16 +64,16 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const fetchTronData = async (endpoint: string, params: Record<string, string>, retries = 3) => {
     // Set higher default limit if not overridden
     const limit = params.limit || '100';
-    const urlParams = new URLSearchParams({ limit, ...params }); 
+    const urlParams = new URLSearchParams({ limit, ...params });
     const targetUrl = `${TRON_HOST}/${endpoint}?${urlParams.toString()}`;
     const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
-    
+
     for (let i = 0; i < retries; i++) {
         try {
-            const response = await fetch(proxyUrl, { 
-                headers: { 'TRON-PRO-API-KEY': TRON_API_KEY } 
+            const response = await fetch(proxyUrl, {
+                headers: { 'TRON-PRO-API-KEY': TRON_API_KEY }
             });
-            
+
             if (response.status === 429) {
                 const waitTime = (i + 1) * 1000;
                 console.warn(`Tron API Rate Limit (429) on ${endpoint}. Retrying in ${waitTime}ms...`);
@@ -114,7 +115,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
     try {
         const transactions: Transaction[] = [];
         const seenIds = new Set<string>();
-        const seenHashes = new Set<string>(); 
+        const seenHashes = new Set<string>();
 
         // Execute all requests with allSettled to prevent one failure from blocking others
         // Increase limit to 100 to ensure we catch more tokens if they exist
@@ -136,10 +137,10 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                 assets.forEach((tx: any) => {
                     const txDate = new Date(tx.timestamp);
                     if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                    
+
                     const isTRC10 = tx.tokenInfo && tx.tokenInfo.tokenType === 'trc10';
                     const sourceType = isTRC10 ? 'TRC10' : 'TRX';
-                    
+
                     let decimals = 6;
                     if (isTRC10 && tx.tokenInfo && tx.tokenInfo.tokenDecimal !== undefined) {
                         decimals = tx.tokenInfo.tokenDecimal;
@@ -147,7 +148,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
 
                     const value = parseFloat(tx.amount) / Math.pow(10, decimals);
                     const symbol = tx.tokenInfo ? tx.tokenInfo.tokenAbbr : 'TRX';
-                    
+
                     const uniqueId = `trx_asset_${tx.transactionHash}_${tx.blockId}`;
 
                     if(!seenIds.has(uniqueId)) {
@@ -254,7 +255,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                         hash: tx.transaction_id,
                         from: tx.from_address,
                         to: tx.to_address,
-                        value: value, 
+                        value: value,
                         token: tokenLabel,
                         timestamp: txDate.toISOString(),
                         status: getTronStatus(tx.confirmed, tx.contractRet),
@@ -273,10 +274,10 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
              internals.forEach((tx: any) => {
                  const txDate = new Date(tx.timestamp);
                  if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                 
+
                  const uniqueId = `internal_${tx.hash}_${tx.from}_${tx.to}_${tx.value}`;
                  const value = parseFloat(tx.value) / 1000000;
-                 
+
                  if (!seenIds.has(uniqueId)) {
                      seenIds.add(uniqueId);
                      transactions.push({
@@ -303,13 +304,13 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
             generics.forEach((tx: any) => {
                 const txDate = new Date(tx.timestamp);
                 if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                
+
                 if (seenHashes.has(tx.hash)) return;
 
                 const uniqueId = `gen_${tx.hash}`;
                 let value = 0;
                 let token = 'TRX';
-                
+
                 if (tx.contractData && tx.contractData.amount) {
                     value = parseFloat(tx.contractData.amount) / 1000000;
                 }
@@ -340,110 +341,118 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
         console.error("TronScan API Critical Failure:", error);
         return [];
     }
-}
-
-export const fetchAddressHistory = async (address: string, chainId: string = '1', dateRange?: { start: Date, end: Date }): Promise<{ data: Transaction[], error?: string }> => {
-    try {
-        if (chainId === 'TRON') {
-            if (!address.startsWith('T') || address.length !== 34) {
-                return { data: [], error: 'Invalid Tron Address (must start with T)' };
-            }
-            const data = await fetchTronHistory(address, dateRange);
-            return { data };
-        }
-
-        if (!address.startsWith('0x') || address.length !== 42) {
-            return { data: [], error: 'Invalid Ethereum/EVM Address' };
-        }
-
-        const chainConfig = SUPPORTED_CHAINS.find(c => c.id === chainId) || SUPPORTED_CHAINS[0];
-        const currency = chainConfig.currency;
-
-        const buildUrl = (action: 'txlist' | 'tokentx' | 'txlistinternal') => {
-            const params = new URLSearchParams({
-                chainid: chainId,
-                module: 'account',
-                action: action,
-                address: address,
-                page: '1',
-                offset: '1000',
-                sort: 'desc',
-                apikey: ETH_API_KEY
-            });
-            // Ensure startblock and endblock are present for better compatibility with Etherscan-like APIs
-            params.append('startblock', '0');
-            params.append('endblock', '99999999');
-            return `${BASE_URL}?${params.toString()}`;
-        };
-
-        // Use allSettled for EVM too to prevent token failures from killing native data
-        const results = await Promise.allSettled([
-            fetch(buildUrl('txlist')),
-            fetch(buildUrl('tokentx'))
-        ]);
-
-        const txRes = results[0].status === 'fulfilled' ? await results[0].value.json() : { status: '0', result: [] };
-        const tokenRes = results[1].status === 'fulfilled' ? await results[1].value.json() : { status: '0', result: [] };
-
-        let transactions: Transaction[] = [];
-
-        if (txRes.status === '1' && Array.isArray(txRes.result)) {
-            const natives = txRes.result
-                .map((tx: any) => {
-                    const txDate = new Date(parseInt(tx.timeStamp) * 1000);
-                    if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return null;
-
-                    return {
-                        id: Math.random().toString(36).substr(2, 9),
-                        hash: tx.hash,
-                        from: tx.from,
-                        to: tx.to || 'Contract Creation',
-                        value: parseFloat(tx.value) / 1e18,
-                        token: currency.toUpperCase(),
-                        timestamp: txDate.toISOString(),
-                        status: tx.isError === '0' ? 'success' : 'failed',
-                        method: tx.functionName?.split('(')[0] || (tx.input && tx.input !== '0x' ? 'Contract' : 'Transfer'),
-                        block: parseInt(tx.blockNumber),
-                        fee: (parseInt(tx.gasUsed) * parseInt(tx.gasPrice)) / 1e18,
-                        type: 'native' as TxType
-                    };
-                })
-                .filter((tx: any) => tx !== null);
-            transactions = [...transactions, ...natives];
-        }
-
-        if (tokenRes.status === '1' && Array.isArray(tokenRes.result)) {
-            const tokens = tokenRes.result
-                .map((tx: any) => {
-                    const txDate = new Date(parseInt(tx.timeStamp) * 1000);
-                    if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return null;
-                    
-                    const tokenSym = (tx.tokenSymbol || 'TOKEN').toUpperCase();
-
-                    return {
-                        id: Math.random().toString(36).substr(2, 9),
-                        hash: tx.hash,
-                        from: tx.from,
-                        to: tx.to,
-                        value: parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal || '18')),
-                        token: tokenSym,
-                        timestamp: txDate.toISOString(),
-                        status: 'success',
-                        method: 'Transfer [ERC20]', // Standardize
-                        block: parseInt(tx.blockNumber),
-                        type: 'erc20' as TxType
-                    };
-                })
-                .filter((tx: any) => tx !== null);
-            transactions = [...transactions, ...tokens];
-        }
-
-        return { 
-            data: transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) 
-        };
-
-    } catch (error) {
-        console.error("API Error:", error);
-        return { data: [], error: 'Failed to connect to Blockchain Explorer' };
-    }
 };
+
+export async function POST(request: NextRequest) {
+  try {
+    const { address, chainId = '1', dateRange }: {
+      address: string;
+      chainId?: string;
+      dateRange?: { start: Date, end: Date }
+    } = await request.json();
+
+    if (chainId === 'TRON') {
+        if (!address.startsWith('T') || address.length !== 34) {
+            return NextResponse.json({ data: [], error: 'Invalid Tron Address (must start with T)' }, { status: 400 });
+        }
+        const data = await fetchTronHistory(address, dateRange);
+        return NextResponse.json({ data });
+    }
+
+    if (!address.startsWith('0x') || address.length !== 42) {
+        return NextResponse.json({ data: [], error: 'Invalid Ethereum/EVM Address' }, { status: 400 });
+    }
+
+    const chainConfig = SUPPORTED_CHAINS.find(c => c.id === chainId) || SUPPORTED_CHAINS[0];
+    const currency = chainConfig.currency;
+
+    const buildUrl = (action: 'txlist' | 'tokentx' | 'txlistinternal') => {
+        const params = new URLSearchParams({
+            chainid: chainId,
+            module: 'account',
+            action: action,
+            address: address,
+            page: '1',
+            offset: '1000',
+            sort: 'desc',
+            apikey: ETH_API_KEY
+        });
+        // Ensure startblock and endblock are present for better compatibility with Etherscan-like APIs
+        params.append('startblock', '0');
+        params.append('endblock', '99999999');
+        return `${BASE_URL}?${params.toString()}`;
+    };
+
+    // Use allSettled for EVM too to prevent token failures from killing native data
+    const results = await Promise.allSettled([
+        fetch(buildUrl('txlist')),
+        fetch(buildUrl('tokentx'))
+    ]);
+
+    const txRes = results[0].status === 'fulfilled' ? await results[0].value.json() : { status: '0', result: [] };
+    const tokenRes = results[1].status === 'fulfilled' ? await results[1].value.json() : { status: '0', result: [] };
+
+    let transactions: Transaction[] = [];
+
+    if (txRes.status === '1' && Array.isArray(txRes.result)) {
+        const natives = txRes.result
+            .map((tx: any) => {
+                const txDate = new Date(parseInt(tx.timeStamp) * 1000);
+                if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return null;
+
+                return {
+                    id: Math.random().toString(36).substr(2, 9),
+                    hash: tx.hash,
+                    from: tx.from,
+                    to: tx.to || 'Contract Creation',
+                    value: parseFloat(tx.value) / 1e18,
+                    token: currency.toUpperCase(),
+                    timestamp: txDate.toISOString(),
+                    status: tx.isError === '0' ? 'success' : 'failed',
+                    method: tx.functionName?.split('(')[0] || (tx.input && tx.input !== '0x' ? 'Contract' : 'Transfer'),
+                    block: parseInt(tx.blockNumber),
+                    fee: (parseInt(tx.gasUsed) * parseInt(tx.gasPrice)) / 1e18,
+                    type: 'native' as const
+                };
+            })
+            .filter((tx: any) => tx !== null);
+        transactions = [...transactions, ...natives];
+    }
+
+    if (tokenRes.status === '1' && Array.isArray(tokenRes.result)) {
+        const tokens = tokenRes.result
+            .map((tx: any) => {
+                const txDate = new Date(parseInt(tx.timeStamp) * 1000);
+                if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return null;
+
+                const tokenSym = (tx.tokenSymbol || 'TOKEN').toUpperCase();
+
+                return {
+                    id: Math.random().toString(36).substr(2, 9),
+                    hash: tx.hash,
+                    from: tx.from,
+                    to: tx.to,
+                    value: parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal || '18')),
+                    token: tokenSym,
+                    timestamp: txDate.toISOString(),
+                    status: 'success',
+                    method: 'Transfer [ERC20]', // Standardize
+                    block: parseInt(tx.blockNumber),
+                    type: 'erc20' as const
+                };
+            })
+            .filter((tx: any) => tx !== null);
+        transactions = [...transactions, ...tokens];
+    }
+
+    const result = {
+        data: transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    };
+
+    return NextResponse.json(result);
+
+  } catch (error) {
+    console.error("API Error:", error);
+    return NextResponse.json({ data: [], error: 'Failed to connect to Blockchain Explorer' }, { status: 500 });
+  }
+}
