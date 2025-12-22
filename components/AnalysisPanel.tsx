@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Transaction, GeminiAnalysisResponse, TxType } from '../types';
 import { analyzeChainData } from '../services/geminiService';
 import { motion } from 'framer-motion';
-import { Sparkles, AlertTriangle, CheckCircle, Activity, Search, ShieldAlert, TrendingUp } from 'lucide-react';
+import { Sparkles, CheckCircle, Activity, Search, ShieldAlert, TrendingUp } from 'lucide-react';
 
 interface AnalysisPanelProps {
   data: Transaction[];

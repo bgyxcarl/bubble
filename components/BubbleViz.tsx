@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Transaction, AddressNode, TxType } from '../types';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Search, X, ArrowUpRight, ArrowDownLeft, Filter, List, Activity, Coins, CheckSquare, Square, Users, Zap, Check, Copy, Waypoints, Calendar, Loader2, Layers, Network, ChevronRight, MousePointer2, RefreshCcw, ShieldCheck, Target, ArrowRight, Share2, GitMerge, GitBranch } from 'lucide-react';
-import { SUPPORTED_CHAINS } from '../services/chainService';
+import { Search, X, ArrowUpRight, ArrowDownLeft, Filter, List, Activity, Coins, CheckSquare, Square, Users, Check, Copy, Waypoints, Calendar, Loader2, Layers, Network, ChevronRight, MousePointer2, RefreshCcw, ShieldCheck, Target, ArrowRight, Share2, GitMerge, GitBranch } from 'lucide-react';
+import { SUPPORTED_CHAINS } from '@/lib/constants';
 
 const d3Any = d3 as any;
 const MotionDiv = motion.div as any;

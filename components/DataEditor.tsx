@@ -1,8 +1,8 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Transaction, TxType } from '../types';
-import { SUPPORTED_CHAINS } from '../services/chainService';
 import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SUPPORTED_CHAINS } from '@/lib/constants';
 
 const MotionDiv = motion.div as any;
 const MotionTr = motion.tr as any;

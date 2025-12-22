@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tab, Transaction, TxType } from '../types';
-import { MOCK_DATA } from '../constants';
+import { MOCK_DATA } from '../lib/constants';
 import DataEditor from './DataEditor';
 import BubbleViz from './BubbleViz';
 import AnalysisPanel from './AnalysisPanel';
