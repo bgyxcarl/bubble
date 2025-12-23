@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export default function Register() {
   const [email, setEmail] = useState("")
@@ -108,6 +109,17 @@ export default function Register() {
             </button>
           </div>
         </form>
+        <div className="text-sm text-center">
+          <p className="text-gray-600">
+            Already have an account?{" "}
+            <Link
+              href="/auth/signin"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )

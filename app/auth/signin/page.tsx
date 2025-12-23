@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export default function SignIn() {
   const [email, setEmail] = useState("")
@@ -21,7 +22,7 @@ export default function SignIn() {
     })
 
     if (result?.error) {
-      setError("Invalid credentials")
+      setError("Invalid email or password")
     } else {
       router.push("/")
     }
@@ -82,6 +83,17 @@ export default function SignIn() {
             </button>
           </div>
         </form>
+        <div className="text-sm text-center">
+          <p className="text-gray-600">
+            Don't have an account?{" "}
+            <Link
+              href="/auth/register"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              Register
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )
