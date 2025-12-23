@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { ChevronLeft } from "lucide-react"
 
 export default function Register() {
   const [email, setEmail] = useState("")
@@ -36,7 +37,11 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
+      <Link href="/" className="absolute top-4 left-4 flex items-center text-indigo-600 hover:text-indigo-500">
+        <ChevronLeft className="w-5 h-5 mr-2" />
+        主页
+      </Link>
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
