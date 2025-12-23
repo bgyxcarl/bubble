@@ -10,11 +10,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
     "@google/genai": "^1.30.0",
+    "@prisma/client": "^6.19.1",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "d3": "^7.9.0",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.554.0",
     "next": "14.2.35",
+    "next-auth": "^4.24.13",
+    "prisma": "^6.19.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

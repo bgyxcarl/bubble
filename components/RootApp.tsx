@@ -6,8 +6,9 @@ import { MOCK_DATA } from '../lib/constants';
 import DataEditor from './DataEditor';
 import BubbleViz from './BubbleViz';
 import AnalysisPanel from './AnalysisPanel';
-import { LayoutGrid, Activity, BrainCircuit, Database, Sun, Moon } from 'lucide-react';
+import { LayoutGrid, Activity, BrainCircuit, Database, Sun, Moon, LogIn, UserPlus, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 const RootApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DATA);
@@ -19,6 +20,8 @@ const RootApp: React.FC = () => {
   
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const { data: session, status } = useSession();
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -73,13 +76,38 @@ const RootApp: React.FC = () => {
                 {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
 
-            <div className="flex gap-2 items-center border-l pl-4 border-gray-700">
-                <div className="flex flex-col items-end leading-none">
-                    <span className="text-[10px] font-bold text-gray-500">SYSTEM STATUS</span>
-                    <span className="text-xs font-black text-green-500">OPERATIONAL</span>
+            {/* Auth Buttons */}
+            {status === 'loading' ? (
+                <div className="text-sm">Loading...</div>
+            ) : session ? (
+                <div className="flex gap-2 items-center border-l pl-4 border-gray-700">
+                    <span className="text-sm">Welcome, {session.user?.name || session.user?.email}</span>
+                    <button 
+                        onClick={() => signOut()} 
+                        className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
+                    >
+                        <LogOut size={16} />
+                        Logout
+                    </button>
                 </div>
-                <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-            </div>
+            ) : (
+                <div className="flex gap-2 items-center border-l pl-4 border-gray-700">
+                    <button 
+                        onClick={() => window.location.href = '/auth/signin'} 
+                        className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
+                    >
+                        <LogIn size={16} />
+                        Login
+                    </button>
+                    <button 
+                        onClick={() => window.location.href = '/auth/register'} 
+                        className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
+                    >
+                        <UserPlus size={16} />
+                        Register
+                    </button>
+                </div>
+            )}
         </div>
       </header>
 
