@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
 const getApiKey = (): string => {
+  if (typeof window === "undefined") return "";
   const apiKey = localStorage.getItem('gemini_api_key');
   if (apiKey) {
     return apiKey;
