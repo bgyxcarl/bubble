@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
-import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
-import { authOptions } from "../auth/[...nextauth]/route"
-
-const prisma = new PrismaClient()
+import { prisma } from "@/lib/db"
+import { authOptions } from "@/auth"
 
 export async function PUT(request: NextRequest) {
   try {
