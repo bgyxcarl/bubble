@@ -1,8 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
+const getApiKey = (): string => {
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if (apiKey) {
+    return apiKey;
+  } else {
+    const userApiKey = prompt('请输入您的Gemini API Key:');
+    if (userApiKey) {
+      localStorage.setItem('gemini_api_key', userApiKey);
+      return userApiKey;
+    } else {
+      throw new Error('需要API Key来进行Gemini分析。');
+    }
+  }
+};
+
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
+// const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 // --- EXISTING ANALYSIS FUNCTION ---
 export const analyzeChainData = async (transactions: Transaction[], context: 'native' | 'erc20'): Promise<GeminiAnalysisResponse> => {
