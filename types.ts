@@ -14,6 +14,7 @@ export interface Transaction {
   fee?: number;       // Displayed as "Txn Fee" (Transactions only)
   type: TxType;
   status: 'success' | 'pending' | 'failed';
+  tableId?: string;
 }
 
 export interface AddressNode {

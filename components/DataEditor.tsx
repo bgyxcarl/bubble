@@ -1,9 +1,10 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Transaction, TxType } from '../types';
-import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target } from 'lucide-react';
+import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target, Cloud, CloudDownload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUPPORTED_CHAINS } from '@/lib/constants';
+import { useSession } from 'next-auth/react';
 
 const MotionDiv = motion.div as any;
 const MotionTr = motion.tr as any;
@@ -54,6 +55,7 @@ const parseCSVRow = (row: string): string[] => {
 };
 
 const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setActiveType, theme, baseAddresses, setBaseAddresses }) => {
+    const { data: session } = useSession();
     const [viewMode, setViewMode] = useState<'raw' | 'formatted'>('formatted');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [tempRow, setTempRow] = useState<any | null>(null);
@@ -97,6 +99,14 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         key: 'timestamp',
         direction: 'desc'
     });
+
+    // Cloud Save/Load State
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [saveTableName, setSaveTableName] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [showLoadModal, setShowLoadModal] = useState(false);
+    const [userTables, setUserTables] = useState<any[]>([]);
+    const [isLoadingTables, setIsLoadingTables] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -216,7 +226,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         setTempRow({ ...row });
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (tempRow) {
             const finalRow: Transaction = {
                 ...tempRow,
@@ -227,6 +237,25 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             };
 
             if (isNaN(finalRow.value)) finalRow.value = 0;
+
+            // If it's a DB row, update it
+            if (finalRow.tableId) {
+                try {
+                    const res = await fetch('/api/data-row', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(finalRow)
+                    });
+                    if (!res.ok) {
+                        alert('Failed to update row in database');
+                        return;
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Error updating row');
+                    return;
+                }
+            }
 
             setData(prev => prev.map(row => row.id === finalRow.id ? finalRow : row));
             setEditingId(null);
@@ -245,7 +274,25 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string, tableId?: string, type?: TxType) => {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+
+        if (tableId && type) {
+            try {
+                const res = await fetch(`/api/data-row?id=${id}&type=${type}&tableId=${tableId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) {
+                    alert('Failed to delete from database');
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error deleting row');
+                return;
+            }
+        }
+
         setData(prev => prev.filter(row => row.id !== id));
         if (selectedIds.has(id)) {
             const newSet = new Set(selectedIds);
@@ -441,6 +488,81 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             console.error(e);
         } finally {
             setIsFetching(false);
+        }
+    };
+
+    const handleSaveTable = async () => {
+        const dataToSave = data.filter(d => d.type === activeType);
+
+        if (dataToSave.length === 0) {
+            alert(`No ${activeType === 'native' ? 'Transaction' : 'Token Transfer'} data to save.`);
+            return;
+        }
+
+        if (!saveTableName.trim()) return;
+        setIsSaving(true);
+        try {
+            const response = await fetch('/api/user-tables', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: saveTableName, type: activeType, data: dataToSave })
+            });
+            const result = await response.json();
+            if (response.ok) {
+                setShowSaveModal(false);
+                setSaveTableName('');
+                alert('Table saved successfully!');
+            } else {
+                alert(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save table.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleLoadTableList = async () => {
+        setIsLoadingTables(true);
+        setShowLoadModal(true);
+        try {
+            const response = await fetch('/api/user-tables');
+            if (response.ok) {
+                const tables = await response.json();
+                setUserTables(tables);
+            } else {
+                console.error('Failed to fetch tables');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoadingTables(false);
+        }
+    };
+
+    const handleImportTable = async (tableId: string) => {
+        try {
+            const response = await fetch(`/api/user-tables/${tableId}`);
+            if (response.ok) {
+                const result = await response.json();
+                // Merge data
+                const newTxns = result.data;
+                setData(prev => {
+                    const existingHashes = new Set(prev.map(t => t.hash));
+                    const uniqueNewTxns = newTxns.filter((t: Transaction) => !existingHashes.has(t.hash));
+                    return [...uniqueNewTxns, ...prev];
+                });
+                setShowLoadModal(false);
+                if (result.type !== activeType) {
+                    setActiveType(result.type as TxType);
+                }
+            } else {
+                alert('Failed to load table data.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error loading table.');
         }
     };
 
@@ -645,6 +767,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
 
                     <div className="flex gap-2">
                         <button onClick={() => setShowImportWizard(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Upload size={16} /> <span className="hidden lg:inline">Smart Import</span></button>
+                        {session && (
+                            <>
+                                <button onClick={handleLoadTableList} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><CloudDownload size={16} /> <span className="hidden lg:inline">Load</span></button>
+                                <button onClick={() => setShowSaveModal(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Cloud size={16} /> <span className="hidden lg:inline">Save</span></button>
+                            </>
+                        )}
                         <button onClick={() => setShowFetchModal(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Download size={16} /> Fetch Data</button>
                         <button onClick={handleAddRow} className={`flex items-center gap-2 bg-blue-600 text-white px-4 py-2 font-bold border-2 ${borderMain} neo-shadow-hover transition-transform`}><Plus size={18} /> Add</button>
                     </div>
@@ -803,7 +931,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                                                         )}
                                                         <td className="p-4 flex justify-center gap-3 opacity-40 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={() => handleStartEdit(row)} className="text-blue-500 hover:scale-110 transition-transform"><Edit2 size={16} /></button>
-                                                            <button onClick={() => handleDelete(row.id)} className="text-red-500 hover:scale-110 transition-transform"><Trash2 size={16} /></button>
+                                                            <button onClick={() => handleDelete(row.id, row.tableId, row.type)} className="text-red-500 hover:scale-110 transition-transform"><Trash2 size={16} /></button>
                                                         </td>
                                                     </>
                                                 )}
@@ -946,6 +1074,79 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                     )}
                 </AnimatePresence>, document.body)}
 
+            {mounted && createPortal(
+                <AnimatePresence>
+                    {showSaveModal && (
+                        <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+                            <MotionDiv initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className={`w-full max-w-md ${bgMain} border-4 ${borderMain} neo-shadow-lg p-6 relative ${textMain}`}>
+                                <button onClick={() => setShowSaveModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black"><X size={20} /></button>
+                                <h2 className="text-xl font-black uppercase mb-4 flex items-center gap-2">
+                                    <Cloud size={24} className="text-blue-600" />
+                                    Save User Table
+                                </h2>
+                                <p className="text-sm font-mono text-gray-500 mb-4">Save your current <strong>{activeType === 'native' ? 'Transaction' : 'Token'}</strong> data to your cloud account.</p>
+
+                                <div className="mb-6">
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Table Name</label>
+                                    <input
+                                        value={saveTableName}
+                                        onChange={(e) => setSaveTableName(e.target.value)}
+                                        placeholder="My Analysis 2024..."
+                                        className={`w-full ${inputBg} p-3 border-2 ${borderMain} font-bold focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={handleSaveTable}
+                                    disabled={isSaving || !saveTableName.trim()}
+                                    className={`w-full py-3 bg-blue-600 text-white font-bold uppercase tracking-widest border-2 ${borderMain} neo-shadow-hover transition-all flex items-center justify-center gap-2 ${isSaving ? 'opacity-50' : ''}`}
+                                >
+                                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                    {isSaving ? 'Saving...' : 'Save Table'}
+                                </button>
+                            </MotionDiv>
+                        </MotionDiv>
+                    )}
+
+                    {showLoadModal && (
+                        <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+                            <MotionDiv initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className={`w-full max-w-2xl ${bgMain} border-4 ${borderMain} neo-shadow-lg p-6 relative ${textMain} max-h-[80vh] flex flex-col`}>
+                                <button onClick={() => setShowLoadModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black"><X size={20} /></button>
+                                <h2 className="text-xl font-black uppercase mb-4 flex items-center gap-2 shrink-0">
+                                    <CloudDownload size={24} className="text-blue-600" />
+                                    Load Saved Table
+                                </h2>
+
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                                    {isLoadingTables ? (
+                                        <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" size={32} /></div>
+                                    ) : userTables.length === 0 ? (
+                                        <div className="text-center p-12 text-gray-500 font-mono">No saved tables found.</div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {userTables.map(table => (
+                                                <div key={table.id} className={`p-4 border-2 ${borderMain} hover:bg-gray-100/50 transition-colors cursor-pointer group relative`} onClick={() => handleImportTable(table.id)}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h3 className="font-bold text-lg">{table.name}</h3>
+                                                        <span className={`text-[10px] font-black px-1.5 py-0.5 border border-current rounded uppercase ${table.type === 'TRANSACTION' ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-purple-600 border-purple-200 bg-purple-50'}`}>
+                                                            {table.type === 'TRANSACTION' ? 'Native' : 'ERC20'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 font-mono mb-2">
+                                                        {new Date(table.createdAt).toLocaleDateString()}
+                                                    </div>
+                                                    <div className="flex gap-3 text-xs font-bold text-gray-400 group-hover:text-black transition-colors">
+                                                        <span>{table._count.transactions + table._count.tokenTransfers} Rows</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </MotionDiv>
+                        </MotionDiv>
+                    )}
+                </AnimatePresence>, document.body)}
         </div>
     );
 };

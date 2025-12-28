@@ -1,0 +1,100 @@
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { prisma } from "@/lib/db";
+import { NextResponse } from "next/server";
+import { TableType } from "@prisma/client";
+
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+    const session = await getServerSession(authOptions);
+    if (!session || !(session.user as any).id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = (session.user as any).id;
+    const tableId = params.id;
+
+    try {
+        const table = await prisma.userTable.findUnique({
+            where: { id: tableId },
+        });
+
+        if (!table || table.userId !== userId) {
+            return NextResponse.json({ error: "Table not found" }, { status: 404 });
+        }
+
+        let data = [];
+        if (table.type === TableType.TRANSACTION) {
+            const txns = await prisma.transaction.findMany({ where: { tableId } });
+            data = txns.map(t => ({
+                id: t.id,
+                hash: t.hash,
+                method: t.method,
+                block: t.block,
+                timestamp: t.age.toISOString(),
+                from: t.from,
+                to: t.to,
+                value: t.amount,
+                fee: t.txnFee,
+                type: 'native',
+                status: 'success',
+                tableId: t.tableId
+            }));
+        } else {
+            const transfers = await prisma.tokenTransfer.findMany({ where: { tableId } });
+            data = transfers.map(t => ({
+                id: t.id,
+                hash: t.hash,
+                method: t.method,
+                block: t.block,
+                timestamp: t.age.toISOString(),
+                from: t.from,
+                to: t.to,
+                value: t.amount,
+                token: t.token,
+                type: 'erc20',
+                status: 'success',
+                tableId: t.tableId
+            }));
+        }
+
+        return NextResponse.json({
+            ...table,
+            data
+        });
+
+    } catch (error) {
+        console.error("Failed to fetch table data:", error);
+        return NextResponse.json({ error: "Failed to fetch table data" }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+    const session = await getServerSession(authOptions);
+    if (!session || !(session.user as any).id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = (session.user as any).id;
+    const tableId = params.id;
+
+    try {
+        const table = await prisma.userTable.findUnique({
+            where: { id: tableId },
+        });
+
+        if (!table || table.userId !== userId) {
+            return NextResponse.json({ error: "Table not found" }, { status: 404 });
+        }
+
+        await prisma.userTable.delete({
+            where: { id: tableId }
+        });
+
+        return NextResponse.json({ success: true });
+
+    } catch (error) {
+        console.error("Failed to delete table:", error);
+        return NextResponse.json({ error: "Failed to delete table" }, { status: 500 });
+    }
+}

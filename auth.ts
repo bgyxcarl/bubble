@@ -1,7 +1,16 @@
-import NextAuth, { AuthOptions } from "next-auth"
+import NextAuth, { AuthOptions, DefaultSession } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name: string;
+    } & DefaultSession["user"];
+  }
+}
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -61,9 +70,15 @@ export const authOptions: AuthOptions = {
     },
     async session({ session, token }) {
       // We are adding the user's name from the token to the session object.
-      if (token?.name && session.user) {
-        session.user.name = token.name as string
+      if (session.user) {
+        if (token.name) {
+          session.user.name = token.name as string
+        }
+        if (token.sub) {
+          session.user.id = token.sub
+        }
       }
+
       return session
     },
   },
