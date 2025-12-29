@@ -2,6 +2,8 @@ import NextAuth, { AuthOptions, DefaultSession } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { generateUserId } from "./lib/utils";
 
 declare module "next-auth" {
   interface Session {
@@ -13,6 +15,50 @@ declare module "next-auth" {
 }
 
 export const authOptions: AuthOptions = {
+  adapter: {
+    ...PrismaAdapter(prisma),
+    createUser: async (data) => {
+      // console.log("default createUser", data);
+
+      if (!data.email || data.email.trim() === '') {
+        throw new Error('Email is required and cannot be empty');
+      }
+
+      const maxAttempts = 3;
+      for (let i = 0; i < maxAttempts; i++) {
+        const userId = generateUserId(data.email, 8+i, true);
+
+        try {
+          // 长度随重试增加: 8 -> 9 -> 10
+          return await prisma.user.create({
+            data: {
+              ...data,
+              id: userId,
+            },
+          });
+          // console.log("User created successfully:", user);
+          // return user;
+        } catch (error) {
+          if ((error as any).code === 'P2002') {
+            console.log(`CreateUser: Duplicate ID detected, retrying... Attempt ${i + 1}`);
+            continue;
+          } else {
+            console.error("CreateUser: Error occurred", error);
+            throw error;
+          }
+        }
+      }
+
+      console.log("All attempts failed, using cuid as userId");
+      return prisma.user.create({
+        data: {
+          ...data,
+          // id: crypto.randomUUID(),
+          id: generateUserId(data.email, 16, true),
+        },
+      });
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",
