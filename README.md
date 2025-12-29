@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1z3ee-QPuU4c-dltPt0rWUf
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+update db: npx prisma db push
+
+

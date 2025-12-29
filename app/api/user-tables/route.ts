@@ -51,6 +51,16 @@ export async function POST(req: Request) {
     }
 
     const userId = (session.user as any).id;
+
+    // Validate that the user actually exists given the foreign key constraint
+    // const userExists = await prisma.user.findUnique({
+    //   where: { id: userId }
+    // });
+
+    // if (!userExists) {
+    //   return NextResponse.json({ error: "User not found. Please re-login." }, { status: 401 });
+    // }
+
     const tableType = type === 'native' ? TableType.TRANSACTION : TableType.TOKEN_TRANSFER;
 
     // Check if table name exists for user
@@ -77,7 +87,7 @@ export async function POST(req: Request) {
         hash: d.hash,
         method: d.method,
         block: Number(d.block),
-        age: new Date(d.timestamp),
+        time: new Date(d.timestamp),
         from: d.from,
         to: d.to,
         amount: Number(d.value) || 0,
@@ -90,7 +100,7 @@ export async function POST(req: Request) {
         hash: d.hash,
         method: d.method,
         block: Number(d.block),
-        age: new Date(d.timestamp),
+        time: new Date(d.timestamp),
         from: d.from,
         to: d.to,
         amount: Number(d.value) || 0,

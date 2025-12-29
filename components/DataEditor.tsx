@@ -23,17 +23,7 @@ type SortKey = keyof Transaction;
 type SortDirection = 'asc' | 'desc';
 type ImportTypeHint = 'native' | 'erc20' | 'mixed';
 
-const getAge = (timestamp: string) => {
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const secs = Math.floor(diff / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-};
+
 
 const parseCSVRow = (row: string): string[] => {
   const result = [];
@@ -64,6 +54,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [activeTableId, setActiveTableId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -256,9 +247,30 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           alert('Error updating row');
           return;
         }
+      } else if (activeTableId) {
+        // New row in a loaded table -> Create it in DB
+        try {
+          const res = await fetch('/api/data-row', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...finalRow, tableId: activeTableId })
+          });
+          const result = await res.json();
+          if (res.ok) {
+            finalRow.id = result.id;
+            finalRow.tableId = result.tableId;
+          } else {
+            alert('Failed to create row in database: ' + result.error);
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+          alert('Error creating row');
+          return;
+        }
       }
 
-      setData(prev => prev.map(row => row.id === finalRow.id ? finalRow : row));
+      setData(prev => prev.map(row => row.id === tempRow.id ? finalRow : row)); // tempRow.id is the temp ID
       setIsDbLoaded(false);
       setEditingId(null);
       setTempRow(null);
@@ -320,7 +332,23 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
       status: 'pending'
     };
     setData([newRow, ...data]);
-    setIsDbLoaded(false);
+
+    // If not working on a DB table, we mark as not db loaded (meaning "dirty").
+    // If we are on a DB table, we keep it "loaded" conceptually, but we need to save the new row.
+    // Actually, "isDbLoaded" controls the "Save" button state (disabled if loaded).
+    // If we simply add a row, we want to allow editing it.
+
+    if (!activeTableId) {
+      setIsDbLoaded(false);
+    }
+    // If activeTableId exists, we don't set isDbLoaded(false) necessarily? 
+    // Actually, setting isDbLoaded(false) enables the big "Save" button for the whole table.
+    // If we are syncing per-row, we might not need the big save button for *this* change, 
+    // BUT we might still want it for compatibility.
+    // However, the user request "add needs to sync update data" implies immediate persistence or consistency.
+    // Let's keep isDbLoaded(false) only if we aren't auto-saving.
+    // But my plan is to auto-save the new row on "Save" checkmark click.
+
     handleStartEdit(newRow);
   };
 
@@ -329,6 +357,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   };
 
   const handleCSVImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setActiveTableId(null);
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -383,12 +412,42 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           if (rowType === 'native') addedNative++;
           else addedErc20++;
 
+          let timestampStr = getCol(mapping.timestampIndex);
+          if (!timestampStr) {
+            timestampStr = new Date().toISOString();
+          } else {
+            // Attempt to parse timestamp. 
+            // If it's pure numbers, it could be seconds or milliseconds.
+            // If it looks like a string date, Date.parse might work.
+            const num = Number(timestampStr);
+            if (!isNaN(num) && num > 0) {
+              // Check if it's likely seconds (small number) or ms (large number)
+              // Simple heuristic: year 2000 is ~946684800 seconds (9 digits)
+              // Year 2000 in ms is ~946684800000 (12 digits)
+              if (num < 10000000000) {
+                // likely seconds
+                timestampStr = new Date(num * 1000).toISOString();
+              } else {
+                // likely milliseconds
+                timestampStr = new Date(num).toISOString();
+              }
+            } else {
+              const parsed = Date.parse(timestampStr);
+              if (!isNaN(parsed)) {
+                timestampStr = new Date(parsed).toISOString();
+              } else {
+                // Fallback
+                timestampStr = new Date().toISOString();
+              }
+            }
+          }
+
           return {
             id: Math.random().toString(36).substr(2, 9),
             hash: getCol(mapping.hashIndex) || `0x${Math.random().toString(16).substr(2, 16)}...`,
             method: getCol(mapping.methodIndex) || 'Transfer',
             block: parseInt(getCol(mapping.blockIndex)) || 0,
-            timestamp: getCol(mapping.timestampIndex) || new Date().toISOString(),
+            timestamp: timestampStr,
             from: getCol(mapping.fromIndex) || '0xUnknown',
             to: getCol(mapping.toIndex) || '0xUnknown',
             value: isNaN(val) ? 0 : val,
@@ -560,6 +619,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           return [...uniqueNewTxns, ...prev];
         });
         setIsDbLoaded(true);
+        setActiveTableId(result.id);
         setShowLoadModal(false);
         if (result.type !== activeType) {
           setActiveType(result.type as TxType);
@@ -840,7 +900,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                   <SortHeader label="Transaction Hash" field="hash" />
                   <SortHeader label="Method" field="method" />
                   <SortHeader label="Block" field="block" />
-                  <SortHeader label="Age" field="timestamp" />
+                  <SortHeader label="Time" field="timestamp" />
                   <SortHeader label="From" field="from" />
                   <SortHeader label="To" field="to" />
                   <SortHeader label="Amount" field="value" className="text-right" />
@@ -916,7 +976,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                             <td className="p-4 text-blue-500 cursor-pointer hover:underline text-xs font-medium">{truncate(row.hash)}</td>
                             <td className="p-4"><span className={`${theme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-300' : 'bg-gray-800 text-gray-300 border-gray-700'} border px-2 py-1 rounded text-xs font-bold`}>{row.method}</span></td>
                             <td className="p-4 text-xs text-blue-500 hover:underline cursor-pointer">{row.block}</td>
-                            <td className="p-4 text-gray-500 text-xs" title={new Date(row.timestamp).toLocaleString()}>{getAge(row.timestamp)}</td>
+                            <td className="p-4 text-gray-500 text-xs" title={new Date(row.timestamp).toLocaleString()}>{new Date(row.timestamp).toLocaleString()}</td>
 
                             <td className="p-4 relative">
                               <span className={`inline-block px-2 py-1 rounded ${theme === 'light' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-900/30 text-indigo-300 border-indigo-800'} border font-mono text-xs font-bold truncate max-w-[140px] shadow-sm`} title={row.from}>

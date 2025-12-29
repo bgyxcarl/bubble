@@ -38,9 +38,9 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String?
-  email         String    @unique
+  email         String      @unique
   emailVerified DateTime?
   image         String?
   password      String?
@@ -63,55 +63,55 @@ enum TableType {
 }
 
 model UserTable {
-  id         String      @id @default(cuid())
-  name       String      // 表的名称
-  type       TableType   // 表的类型（transaction 或 tokenTransfer）
-  createdAt  DateTime    @default(now())
+  id        String    @id @default(cuid())
+  name      String // 表的名称
+  type      TableType // 表的类型（transaction 或 tokenTransfer）
+  createdAt DateTime  @default(now())
 
-  userId     String         
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // updatedAt  DateTime    @updatedAt
   // data       Json        // 表的数据，存储为 JSON 格式
-  transactions    Transaction[]
-  tokenTransfers  TokenTransfer[]
+  transactions   Transaction[]
+  tokenTransfers TokenTransfer[]
 
   @@unique([userId, name])
 }
 
 model Transaction {
-  id          String      @id @default(cuid())
-  hash        String   // 交易哈希
-  method      String   // 交易方式
-  block       Int      // 区块号
-  age         DateTime // 交易发生的时间
-  from        String   // 发起者地址
-  to          String   // 接收者地址
-  amount      Float    // 交易金额
-  txnFee      Float    // 交易费用
+  id     String   @id @default(cuid())
+  hash   String // 交易哈希
+  method String // 交易方式
+  block  Int // 区块号
+  time   DateTime // 交易发生的时间
+  from   String // 发起者地址
+  to     String // 接收者地址
+  amount Float // 交易金额
+  txnFee Float // 交易费用
   // createdAt   DateTime @default(now())
   // updatedAt   DateTime @updatedAt
 
-  tableId     String
-  table       UserTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String
+  table   UserTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@index([tableId])
 }
 
 model TokenTransfer {
-  id          String      @id @default(cuid())
-  hash        String   // 代币转移哈希
-  method      String   // 代币转移方法
-  block       Int      // 区块号
-  age         DateTime // 转移发生的时间
-  from        String   // 转出地址
-  to          String   // 转入地址
-  amount      Float    // 代币转移数量
-  token       String   // 代币种类（如 ETH, BTC）
+  id     String   @id @default(cuid())
+  hash   String // 代币转移哈希
+  method String // 代币转移方法
+  block  Int // 区块号
+  time   DateTime // 转移发生的时间
+  from   String // 转出地址
+  to     String // 转入地址
+  amount Float // 代币转移数量
+  token  String // 代币种类（如 ETH, BTC）
   // createdAt   DateTime @default(now())
   // updatedAt   DateTime @updatedAt
 
-  tableId     String
-  table       UserTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String
+  table   UserTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@index([tableId])
 }
