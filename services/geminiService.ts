@@ -2,13 +2,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
 const getApiKey = (): string => {
-  // if (typeof window === "undefined") return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
-  // // First check Next.js env
-  // if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+  // First check Next.js env
+  if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
   const apiKey = localStorage.getItem('gemini_api_key');
   if (apiKey) {
-    console.log('Using stored API key');
     return apiKey;
   } else {
     const userApiKey = prompt('请输入您的Gemini API Key:');
