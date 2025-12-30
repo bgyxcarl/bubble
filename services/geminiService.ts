@@ -2,13 +2,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
 const getApiKey = (): string => {
-  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
-
-  // First check Next.js env
-  if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  // if (typeof window === "undefined") return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+  // // First check Next.js env
+  // if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
   const apiKey = localStorage.getItem('gemini_api_key');
   if (apiKey) {
+    console.log('Using stored API key');
     return apiKey;
   } else {
     const userApiKey = prompt('请输入您的Gemini API Key:');
@@ -84,7 +84,7 @@ export const analyzeChainData = async (transactions: Transaction[], context: 'na
         }
       }
     });
-
+    console.log('response', response);
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
 
@@ -165,7 +165,7 @@ export const normalizeCsvData = async (csvSnippet: string, userHint: string): Pr
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",

@@ -5,6 +5,7 @@ import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Downlo
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUPPORTED_CHAINS } from '@/lib/constants';
 import { useSession } from 'next-auth/react';
+import { normalizeCsvData } from '@/services/geminiService';
 
 const MotionDiv = motion.div as any;
 const MotionTr = motion.tr as any;
@@ -422,14 +423,15 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
       const snippet = lines.slice(0, 5).join('\n');
 
       try {
-        const response = await fetch('/api/normalize-csv', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ csvSnippet: snippet, userHint: importHint }),
-        });
-        const mapping = await response.json();
+        // const response = await fetch('/api/normalize-csv', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //   },
+        //   body: JSON.stringify({ csvSnippet: snippet, userHint: importHint }),
+        // });
+        // const mapping = await response.json();
+        const mapping = await normalizeCsvData(snippet, importHint);
         const startIdx = mapping.hasHeader ? 1 : 0;
         let addedNative = 0;
         let addedErc20 = 0;
