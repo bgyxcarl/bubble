@@ -2,10 +2,10 @@ import { SUPPORTED_CHAINS } from '@/lib/constants';
 import { Transaction, TxType } from '../types';
 
 const BASE_URL = 'https://api.etherscan.io/v2/api';
-const ETH_API_KEY = process.env.ETH_API_KEY;
+const ETH_API_KEY = process.env.NEXT_PUBLIC_ETH_API_KEY;
 
 // Using a Rotating Key strategy or standard key for Tron
-const TRON_API_KEY = process.env.TRON_API_KEY;
+const TRON_API_KEY = process.env.NEXT_PUBLIC_TRON_API_KEY;
 const TRON_HOST = 'https://apilist.tronscanapi.com/api';
 const CORS_PROXY = 'https://corsproxy.io/?';
 
@@ -22,16 +22,16 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const fetchTronData = async (endpoint: string, params: Record<string, string>, retries = 3) => {
     // Set higher default limit if not overridden
     const limit = params.limit || '100';
-    const urlParams = new URLSearchParams({ limit, ...params }); 
+    const urlParams = new URLSearchParams({ limit, ...params });
     const targetUrl = `${TRON_HOST}/${endpoint}?${urlParams.toString()}`;
     const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
-    
+
     for (let i = 0; i < retries; i++) {
         try {
-            const response = await fetch(proxyUrl, { 
-                headers: { 'TRON-PRO-API-KEY': TRON_API_KEY } 
+            const response = await fetch(proxyUrl, {
+                headers: { 'TRON-PRO-API-KEY': TRON_API_KEY }
             });
-            
+
             if (response.status === 429) {
                 const waitTime = (i + 1) * 1000;
                 console.warn(`Tron API Rate Limit (429) on ${endpoint}. Retrying in ${waitTime}ms...`);
@@ -42,7 +42,7 @@ const fetchTronData = async (endpoint: string, params: Record<string, string>, r
             if (!response.ok) return null;
             return await response.json();
         } catch (e) {
-            console.warn(`Tron Fetch Attempt ${i+1} Failed for ${endpoint}`, e);
+            console.warn(`Tron Fetch Attempt ${i + 1} Failed for ${endpoint}`, e);
             if (i === retries - 1) return null;
             await sleep(1000);
         }
@@ -73,7 +73,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
     try {
         const transactions: Transaction[] = [];
         const seenIds = new Set<string>();
-        const seenHashes = new Set<string>(); 
+        const seenHashes = new Set<string>();
 
         // Execute all requests with allSettled to prevent one failure from blocking others
         // Increase limit to 100 to ensure we catch more tokens if they exist
@@ -95,10 +95,10 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                 assets.forEach((tx: any) => {
                     const txDate = new Date(tx.timestamp);
                     if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                    
+
                     const isTRC10 = tx.tokenInfo && tx.tokenInfo.tokenType === 'trc10';
                     const sourceType = isTRC10 ? 'TRC10' : 'TRX';
-                    
+
                     let decimals = 6;
                     if (isTRC10 && tx.tokenInfo && tx.tokenInfo.tokenDecimal !== undefined) {
                         decimals = tx.tokenInfo.tokenDecimal;
@@ -106,10 +106,10 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
 
                     const value = parseFloat(tx.amount) / Math.pow(10, decimals);
                     const symbol = tx.tokenInfo ? tx.tokenInfo.tokenAbbr : 'TRX';
-                    
+
                     const uniqueId = `trx_asset_${tx.transactionHash}_${tx.blockId}`;
 
-                    if(!seenIds.has(uniqueId)) {
+                    if (!seenIds.has(uniqueId)) {
                         seenIds.add(uniqueId);
                         transactions.push({
                             id: uniqueId,
@@ -143,7 +143,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                 const value = parseFloat(tx.quant) / Math.pow(10, decimals);
                 const symbol = tx.tokenInfo ? tx.tokenInfo.tokenAbbr : 'TRC20';
 
-                if(!seenIds.has(uniqueId)) {
+                if (!seenIds.has(uniqueId)) {
                     seenIds.add(uniqueId);
                     transactions.push({
                         id: uniqueId,
@@ -174,7 +174,7 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                 const symbol = tx.tokenInfo ? tx.tokenInfo.tokenAbbr : 'NFT';
                 const tokenLabel = `${symbol} #${tx.token_id}`;
 
-                if(!seenIds.has(uniqueId)) {
+                if (!seenIds.has(uniqueId)) {
                     seenIds.add(uniqueId);
                     transactions.push({
                         id: uniqueId,
@@ -206,14 +206,14 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
                 const tokenLabel = `${symbol} #${tx.token_id}`;
                 const value = parseFloat(tx.quant || '1');
 
-                if(!seenIds.has(uniqueId)) {
+                if (!seenIds.has(uniqueId)) {
                     seenIds.add(uniqueId);
                     transactions.push({
                         id: uniqueId,
                         hash: tx.transaction_id,
                         from: tx.from_address,
                         to: tx.to_address,
-                        value: value, 
+                        value: value,
                         token: tokenLabel,
                         timestamp: txDate.toISOString(),
                         status: getTronStatus(tx.confirmed, tx.contractRet),
@@ -228,32 +228,32 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
 
         // --- PROCESS 5: INTERNAL TRANSACTIONS ---
         if (internalRes.status === 'fulfilled' && internalRes.value) {
-             const internals = internalRes.value.data || [];
-             internals.forEach((tx: any) => {
-                 const txDate = new Date(tx.timestamp);
-                 if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                 
-                 const uniqueId = `internal_${tx.hash}_${tx.from}_${tx.to}_${tx.value}`;
-                 const value = parseFloat(tx.value) / 1000000;
-                 
-                 if (!seenIds.has(uniqueId)) {
-                     seenIds.add(uniqueId);
-                     transactions.push({
-                         id: uniqueId,
-                         hash: tx.hash,
-                         from: tx.from,
-                         to: tx.to,
-                         value: value,
-                         token: 'TRX',
-                         timestamp: txDate.toISOString(),
-                         status: !tx.rejected ? 'success' : 'failed',
-                         method: 'Transfer [Internal]',
-                         block: 0,
-                         fee: 0,
-                         type: 'native'
-                     });
-                 }
-             });
+            const internals = internalRes.value.data || [];
+            internals.forEach((tx: any) => {
+                const txDate = new Date(tx.timestamp);
+                if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
+
+                const uniqueId = `internal_${tx.hash}_${tx.from}_${tx.to}_${tx.value}`;
+                const value = parseFloat(tx.value) / 1000000;
+
+                if (!seenIds.has(uniqueId)) {
+                    seenIds.add(uniqueId);
+                    transactions.push({
+                        id: uniqueId,
+                        hash: tx.hash,
+                        from: tx.from,
+                        to: tx.to,
+                        value: value,
+                        token: 'TRX',
+                        timestamp: txDate.toISOString(),
+                        status: !tx.rejected ? 'success' : 'failed',
+                        method: 'Transfer [Internal]',
+                        block: 0,
+                        fee: 0,
+                        type: 'native'
+                    });
+                }
+            });
         }
 
         // --- PROCESS 6: GENERIC TRANSACTIONS (Execution Layer) ---
@@ -262,13 +262,13 @@ const fetchTronHistory = async (address: string, dateRange?: { start: Date, end:
             generics.forEach((tx: any) => {
                 const txDate = new Date(tx.timestamp);
                 if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return;
-                
+
                 if (seenHashes.has(tx.hash)) return;
 
                 const uniqueId = `gen_${tx.hash}`;
                 let value = 0;
                 let token = 'TRX';
-                
+
                 if (tx.contractData && tx.contractData.amount) {
                     value = parseFloat(tx.contractData.amount) / 1000000;
                 }
@@ -376,7 +376,7 @@ export const fetchAddressHistory = async (address: string, chainId: string = '1'
                 .map((tx: any) => {
                     const txDate = new Date(parseInt(tx.timeStamp) * 1000);
                     if (dateRange && (txDate < dateRange.start || txDate > dateRange.end)) return null;
-                    
+
                     const tokenSym = (tx.tokenSymbol || 'TOKEN').toUpperCase();
 
                     return {
@@ -397,8 +397,8 @@ export const fetchAddressHistory = async (address: string, chainId: string = '1'
             transactions = [...transactions, ...tokens];
         }
 
-        return { 
-            data: transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) 
+        return {
+            data: transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         };
 
     } catch (error) {

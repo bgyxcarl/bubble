@@ -2,7 +2,11 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, GeminiAnalysisResponse } from "../types";
 
 const getApiKey = (): string => {
-  if (typeof window === "undefined") return "";
+  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+
+  // First check Next.js env
+  if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
   const apiKey = localStorage.getItem('gemini_api_key');
   if (apiKey) {
     return apiKey;
@@ -23,7 +27,7 @@ const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 // --- EXISTING ANALYSIS FUNCTION ---
 export const analyzeChainData = async (transactions: Transaction[], context: 'native' | 'erc20'): Promise<GeminiAnalysisResponse> => {
-  
+
   // Optimize payload size
   const minimalData = transactions.slice(0, 50).map(tx => ({
     t: tx.timestamp,
@@ -34,7 +38,7 @@ export const analyzeChainData = async (transactions: Transaction[], context: 'na
     type: tx.type
   }));
 
-  const contextPrompt = context === 'erc20' 
+  const contextPrompt = context === 'erc20'
     ? "Focus on token accumulation patterns, dump risks, and high-frequency token swapping behavior."
     : "Focus on large value ETH transfers, gas usage patterns, and exchange deposits/withdrawals.";
 
@@ -56,7 +60,7 @@ export const analyzeChainData = async (transactions: Transaction[], context: 'na
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -83,7 +87,7 @@ export const analyzeChainData = async (transactions: Transaction[], context: 'na
 
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
-    
+
     return JSON.parse(text) as GeminiAnalysisResponse;
 
   } catch (error) {
@@ -161,37 +165,37 @@ export const normalizeCsvData = async (csvSnippet: string, userHint: string): Pr
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-                fromIndex: { type: Type.INTEGER },
-                toIndex: { type: Type.INTEGER },
-                valueIndex: { type: Type.INTEGER },
-                tokenIndex: { type: Type.INTEGER },
-                timestampIndex: { type: Type.INTEGER },
-                hashIndex: { type: Type.INTEGER },
-                methodIndex: { type: Type.INTEGER },
-                blockIndex: { type: Type.INTEGER },
-                feeIndex: { type: Type.INTEGER },
-                hasHeader: { type: Type.BOOLEAN },
-                detectedType: { type: Type.STRING, enum: ['native', 'erc20', 'mixed'] },
-                confidenceReason: { type: Type.STRING }
-            }
+          type: Type.OBJECT,
+          properties: {
+            fromIndex: { type: Type.INTEGER },
+            toIndex: { type: Type.INTEGER },
+            valueIndex: { type: Type.INTEGER },
+            tokenIndex: { type: Type.INTEGER },
+            timestampIndex: { type: Type.INTEGER },
+            hashIndex: { type: Type.INTEGER },
+            methodIndex: { type: Type.INTEGER },
+            blockIndex: { type: Type.INTEGER },
+            feeIndex: { type: Type.INTEGER },
+            hasHeader: { type: Type.BOOLEAN },
+            detectedType: { type: Type.STRING, enum: ['native', 'erc20', 'mixed'] },
+            confidenceReason: { type: Type.STRING }
+          }
         }
       }
     });
-    
+
     return JSON.parse(response.text!) as CsvMapping;
   } catch (e) {
     console.error("CSV AI Mapping failed, falling back to defaults", e);
-    return { 
-        fromIndex: 0, toIndex: 1, valueIndex: 2, tokenIndex: 3, timestampIndex: -1, 
-        hashIndex: -1, methodIndex: -1, blockIndex: -1, feeIndex: -1,
-        hasHeader: true, detectedType: 'native', confidenceReason: 'AI Analysis failed; falling back to default schema.' 
+    return {
+      fromIndex: 0, toIndex: 1, valueIndex: 2, tokenIndex: 3, timestampIndex: -1,
+      hashIndex: -1, methodIndex: -1, blockIndex: -1, feeIndex: -1,
+      hasHeader: true, detectedType: 'native', confidenceReason: 'AI Analysis failed; falling back to default schema.'
     };
   }
 };
