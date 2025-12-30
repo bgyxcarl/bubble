@@ -35,9 +35,9 @@ export async function createUserWithCustomId(data: Prisma.UserCreateInput) {
     throw new Error('Email is required and cannot be empty');
   }
 
-  const maxAttempts = 3;
+  const maxAttempts = 6;
   for (let i = 0; i < maxAttempts; i++) {
-    const userId = generateUserId(data.email, 8 + i, true);
+    const userId = generateUserId(8 + Math.floor(i / 2), true);
 
     try {
       const user = await prisma.user.create({
@@ -63,7 +63,7 @@ export async function createUserWithCustomId(data: Prisma.UserCreateInput) {
     data: {
       ...data,
       // id: crypto.randomUUID(),
-      id: generateUserId(data.email, 16, true),
+      id: generateUserId(16, true),
     },
   });
 }

@@ -1,11 +1,24 @@
 import RootApp from '../components/RootApp'
 
 export default function Page() {
-  // const email = "user@example.com";
-  // const probability4 = testGenerateUserIdDuplicateProbability(email, 8, 200000);
-  // const probability5 = testGenerateUserIdDuplicateProbability(email, 9, 200000);
-  // console.log(`重复概率1: ${probability4}`);
-  // console.log(`重复概率2: ${probability5}`);
+  // let numTests = 10;
+  // let num1 = 0
+  // let num2 = 0
+  // for (let i = 0; i < numTests; i++) {
+  //   const du = testGenerateUserIdDuplicateProbability(8, 200000);
+  //   num1 = num1 + du;
+  // }
+  // for (let i = 0; i < numTests; i++) {
+  //   const du2 = testGenerateUserIdDuplicateProbability(9, 200000);
+  //   num2 = num2 + du2;
+  // }
+  // console.log(`重复1: `, num1/numTests);
+  // console.log(`重复2: `, num2/numTests);
+
+  // const probability4 = testGenerateUserIdDuplicateProbability(8, 20000);
+  // const probability5 = testGenerateUserIdDuplicateProbability(9, 20000);
+  // console.log(`重复1: `, probability4);
+  // console.log(`重复2: `, probability5);
 
 
   // 用于存储重复概率的状态
