@@ -44,6 +44,51 @@ const parseCSVRow = (row: string): string[] => {
   return result;
 };
 
+const InteractiveCell = ({ value, label, truncateLen = 14, theme }: { value: string, label: string, truncateLen?: number, theme: 'light' | 'dark' }) => {
+  const [showFull, setShowFull] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (value) {
+      navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const truncated = value && value.length > truncateLen ? `${value.slice(0, 6)}...${value.slice(-6)}` : value;
+
+  return (
+    <div
+      className="relative group inline-block"
+      onMouseEnter={() => setShowFull(true)}
+      onMouseLeave={() => setShowFull(false)}
+    >
+      <span className={`cursor-pointer ${theme === 'light' ? 'text-blue-600 hover:text-blue-800' : 'text-blue-400 hover:text-blue-300'} font-medium`}>
+        {truncated}
+      </span>
+
+      <AnimatePresence>
+        {showFull && (
+          <MotionDiv
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 5 }}
+            className={`absolute z-50 bottom-full left-0 mb-2 px-3 py-2 text-xs font-mono font-bold whitespace-nowrap border-2 border-black neo-shadow-sm ${theme === 'light' ? 'bg-yellow-100 text-black' : 'bg-gray-800 text-white'}`}
+          >
+            <div className="flex items-center gap-2 cursor-pointer" onClick={handleCopy}>
+              <span>{value}</span>
+              {copied ? <CheckCircle2 size={12} className="text-green-600" /> : <Copy size={12} className="opacity-50" />}
+            </div>
+            <div className={`absolute bottom-[-6px] left-4 w-3 h-3 border-r-2 border-b-2 border-black transform rotate-45 ${theme === 'light' ? 'bg-yellow-100' : 'bg-gray-800'}`}></div>
+          </MotionDiv>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setActiveType, theme, baseAddresses, setBaseAddresses }) => {
   const { data: session } = useSession();
   const [viewMode, setViewMode] = useState<'raw' | 'formatted'>('formatted');
@@ -833,7 +878,6 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setShowImportWizard(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Upload size={16} /> <span className="hidden lg:inline">Smart Import</span></button>
             {session && (
               <>
                 <button onClick={handleLoadTableList} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><CloudDownload size={16} /> <span className="hidden lg:inline">Load</span></button>
@@ -846,8 +890,8 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                 </button>
               </>
             )}
+            <button onClick={() => setShowImportWizard(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Upload size={16} /> <span className="hidden lg:inline">Smart Import</span></button>
             <button onClick={() => setShowFetchModal(true)} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><Download size={16} /> Fetch Data</button>
-            <button onClick={handleAddRow} className={`flex items-center gap-2 bg-blue-600 text-white px-4 py-2 font-bold border-2 ${borderMain} neo-shadow-hover transition-transform`}><Plus size={18} /> Add</button>
           </div>
         </div>
 
@@ -881,6 +925,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             >
               {copyFeedback ? <ClipboardCheck size={14} /> : <Copy size={14} />}
               {copyFeedback ? 'Copied!' : selectedIds.size > 0 ? 'Copy Selected' : 'Copy All'}
+            </button>
+            <button
+              onClick={handleAddRow}
+              className={`flex items-center gap-2 bg-blue-600 text-white px-3 py-1 text-xs font-bold border-2 ${borderMain} transition-all hover:bg-blue-700`}
+            >
+              <Plus size={14} /> Add
             </button>
           </div>
         </div>
@@ -973,22 +1023,25 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                           </>
                         ) : (
                           <>
-                            <td className="p-4 text-blue-500 cursor-pointer hover:underline text-xs font-medium">{truncate(row.hash)}</td>
+
+                            <td className="p-4 text-xs font-medium">
+                              <InteractiveCell value={row.hash} label="Hash" theme={theme} />
+                            </td>
                             <td className="p-4"><span className={`${theme === 'light' ? 'bg-gray-100 text-gray-600 border-gray-300' : 'bg-gray-800 text-gray-300 border-gray-700'} border px-2 py-1 rounded text-xs font-bold`}>{row.method}</span></td>
                             <td className="p-4 text-xs text-blue-500 hover:underline cursor-pointer">{row.block}</td>
                             <td className="p-4 text-gray-500 text-xs" title={new Date(row.timestamp).toLocaleString()}>{new Date(row.timestamp).toLocaleString()}</td>
 
                             <td className="p-4 relative">
-                              <span className={`inline-block px-2 py-1 rounded ${theme === 'light' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-900/30 text-indigo-300 border-indigo-800'} border font-mono text-xs font-bold truncate max-w-[140px] shadow-sm`} title={row.from}>
-                                {truncate(row.from)}
-                              </span>
-                              {baseAddresses.has(row.from.toLowerCase()) && <span className="absolute top-2 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
+                              <div className="flex items-center gap-2">
+                                <InteractiveCell value={row.from} label="From" theme={theme} />
+                                {baseAddresses.has(row.from.toLowerCase()) && <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
+                              </div>
                             </td>
                             <td className="p-4 relative">
-                              <span className={`inline-block px-2 py-1 rounded ${theme === 'light' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : 'bg-fuchsia-900/30 text-fuchsia-300 border-fuchsia-800'} border font-mono text-xs font-bold truncate max-w-[140px] shadow-sm`} title={row.to}>
-                                {truncate(row.to)}
-                              </span>
-                              {baseAddresses.has(row.to.toLowerCase()) && <span className="absolute top-2 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
+                              <div className="flex items-center gap-2">
+                                <InteractiveCell value={row.to} label="To" theme={theme} />
+                                {baseAddresses.has(row.to.toLowerCase()) && <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
+                              </div>
                             </td>
 
                             <td className="p-4 text-right">

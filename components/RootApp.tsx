@@ -14,10 +14,10 @@ const RootApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DATA);
   const [activeType, setActiveType] = useState<TxType>('native');
   const [data, setData] = useState<Transaction[]>(MOCK_DATA);
-  
+
   // Base/Target Addresses State (Nodes marked as '0')
   const [baseAddresses, setBaseAddresses] = useState<Set<string>>(new Set());
-  
+
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -48,12 +48,16 @@ const RootApp: React.FC = () => {
   const borderClass = theme === 'light' ? 'border-black' : 'border-white/20';
 
   const handleAddData = (newTxns: Transaction[]) => {
-      setData(prev => [...newTxns, ...prev]);
+    setData(prev => [...newTxns, ...prev]);
+  };
+
+  const handleDeleteToken = (token: string) => {
+    setData(prev => prev.filter(t => t.token !== token));
   };
 
   return (
     <div className={`min-h-screen flex flex-col overflow-hidden font-sans transition-colors duration-300 ${theme === 'light' ? 'bg-white text-black' : 'bg-black text-white'}`}>
-      
+
       {/* Header / Nav */}
       <header className={`border-b-4 ${borderClass} ${theme === 'light' ? 'bg-white' : 'bg-[#111]'} p-4 flex justify-between items-center z-50 relative`}>
         <div className="flex items-center gap-3">
@@ -74,9 +78,9 @@ const RootApp: React.FC = () => {
               onClick={() => setActiveTab(item.id)}
               className={`
                 flex items-center gap-2 px-4 py-2 font-bold text-sm transition-all border-2 border-transparent
-                ${activeTab === item.id 
-                    ? `${theme === 'light' ? 'bg-white border-black text-black' : 'bg-black border-white text-white'} neo-shadow-sm transform -translate-y-1` 
-                    : 'text-gray-500 hover:text-gray-400 hover:bg-gray-200/10'}
+                ${activeTab === item.id
+                  ? `${theme === 'light' ? 'bg-white border-black text-black' : 'bg-black border-white text-white'} neo-shadow-sm transform -translate-y-1`
+                  : 'text-gray-500 hover:text-gray-400 hover:bg-gray-200/10'}
               `}
             >
               <item.icon size={16} />
@@ -86,78 +90,78 @@ const RootApp: React.FC = () => {
         </nav>
 
         <div className="flex gap-4 items-center">
-             {/* Theme Toggle */}
-            <button onClick={toggleTheme} className={`p-2 border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}>
-                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-            </button>
+          {/* Theme Toggle */}
+          <button onClick={toggleTheme} className={`p-2 border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}>
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
 
-            {/* Auth Buttons */}
-            {status === 'loading' ? (
-              <div className="text-sm">Loading...</div>
-            ) : session ? (
-              <div className="flex gap-2 items-center border-l pl-4 border-gray-700 relative">
-                {/* Avatar and Dropdown */}
-                <div className="relative dropdown-container">
-                  <button
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className={`flex items-center gap-2 p-2 border-2 ${borderClass} hover:bg-gray-200/20 transition-colors rounded-full`}
-                  >
-                    <div className={`w-8 h-8 rounded-full ${theme === 'light' ? 'bg-blue-500' : 'bg-blue-400'} flex items-center justify-center`}>
-                      <User size={16} className="text-white" />
-                    </div>
-                    <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
+          {/* Auth Buttons */}
+          {status === 'loading' ? (
+            <div className="text-sm">Loading...</div>
+          ) : session ? (
+            <div className="flex gap-2 items-center border-l pl-4 border-gray-700 relative">
+              {/* Avatar and Dropdown */}
+              <div className="relative dropdown-container">
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className={`flex items-center gap-2 p-2 border-2 ${borderClass} hover:bg-gray-200/20 transition-colors rounded-full`}
+                >
+                  <div className={`w-8 h-8 rounded-full ${theme === 'light' ? 'bg-blue-500' : 'bg-blue-400'} flex items-center justify-center`}>
+                    <User size={16} className="text-white" />
+                  </div>
+                  <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-                  {/* Dropdown Menu */}
-                  {isDropdownOpen && (
-                    <div className={`absolute right-0 mt-2 w-48 ${theme === 'light' ? 'bg-white border-black' : 'bg-gray-800 border-white/20'} border-2 rounded-md shadow-lg z-50`}>
-                      <div className="py-1">
-                        <div className={`px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'} border-b ${borderClass}`}>
-                          {session.user?.name || session.user?.email}
-                        </div>
-                        <button
-                          onClick={() => {
-                            setIsDropdownOpen(false);
-                            window.location.href = '/profile';
-                          }}
-                          className={`w-full text-left px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'} flex items-center gap-2`}
-                        >
-                          <Settings size={16} />
-                          个人中心
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsDropdownOpen(false);
-                            signOut();
-                          }}
-                          className={`w-full text-left px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'} flex items-center gap-2`}
-                        >
-                          <LogOut size={16} />
-                          退出登录
-                        </button>
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                  <div className={`absolute right-0 mt-2 w-48 ${theme === 'light' ? 'bg-white border-black' : 'bg-gray-800 border-white/20'} border-2 rounded-md shadow-lg z-50`}>
+                    <div className="py-1">
+                      <div className={`px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'} border-b ${borderClass}`}>
+                        {session.user?.name || session.user?.email}
                       </div>
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          window.location.href = '/profile';
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'} flex items-center gap-2`}
+                      >
+                        <Settings size={16} />
+                        个人中心
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          signOut();
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${theme === 'light' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'} flex items-center gap-2`}
+                      >
+                        <LogOut size={16} />
+                        退出登录
+                      </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex gap-2 items-center border-l pl-4 border-gray-700">
-                <button 
-                  onClick={() => window.location.href = '/auth/signin'} 
-                  className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
-                >
-                  <LogIn size={16} />
-                  Login
-                </button>
-                <button 
-                  onClick={() => window.location.href = '/auth/register'} 
-                  className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
-                >
-                  <UserPlus size={16} />
-                  Register
-                </button>
-              </div>
-            )}
+            </div>
+          ) : (
+            <div className="flex gap-2 items-center border-l pl-4 border-gray-700">
+              <button
+                onClick={() => window.location.href = '/auth/signin'}
+                className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
+              >
+                <LogIn size={16} />
+                Login
+              </button>
+              <button
+                onClick={() => window.location.href = '/auth/register'}
+                className={`flex items-center gap-2 px-3 py-1 text-sm border-2 ${borderClass} hover:bg-gray-200/20 transition-colors`}
+              >
+                <UserPlus size={16} />
+                Register
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -170,13 +174,13 @@ const RootApp: React.FC = () => {
 
         <div className="relative z-10 h-full">
           {activeTab === Tab.DATA && (
-            <motion.div 
-              initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} 
+            <motion.div
+              initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
               className="h-full"
             >
-              <DataEditor 
-                data={data} 
-                setData={setData} 
+              <DataEditor
+                data={data}
+                setData={setData}
                 activeType={activeType}
                 setActiveType={setActiveType}
                 theme={theme}
@@ -185,17 +189,24 @@ const RootApp: React.FC = () => {
               />
             </motion.div>
           )}
-          
+
           {activeTab === Tab.VISUALIZE && (
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="h-full"
             >
-              <BubbleViz 
-                data={data} 
+              <BubbleViz
+                data={data}
                 activeType={activeType}
                 setActiveType={setActiveType}
                 onAddData={handleAddData}
+                onDeleteData={(threshold, type) => {
+                  setData(prev => prev.filter(t => {
+                    if (t.type !== type) return true;
+                    return t.value >= threshold;
+                  }));
+                }}
+                onDeleteToken={handleDeleteToken}
                 theme={theme}
                 baseAddresses={baseAddresses}
               />
@@ -203,20 +214,20 @@ const RootApp: React.FC = () => {
           )}
 
           {activeTab === Tab.ANALYSIS && (
-            <motion.div 
-              initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} 
+            <motion.div
+              initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
               className="h-full"
             >
-              <AnalysisPanel 
-                  data={data} 
-                  activeType={activeType}
-                  theme={theme}
+              <AnalysisPanel
+                data={data}
+                activeType={activeType}
+                theme={theme}
               />
             </motion.div>
           )}
         </div>
       </main>
-      
+
       <style>{`
         @keyframes blob {
             0% { transform: translate(0px, 0px) scale(1); }
