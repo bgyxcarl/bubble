@@ -38,15 +38,16 @@ model Session {
 }
 
 model User {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String?
-  email         String      @unique
+  email         String       @unique
   emailVerified DateTime?
   image         String?
   password      String?
   accounts      Account[]
   sessions      Session[]
   tables        UserTable[] // 用户上传的表
+  addressTags   AddressTag[] // 用户标记的地址
 }
 
 model VerificationToken {
@@ -60,6 +61,11 @@ model VerificationToken {
 enum TableType {
   TRANSACTION
   TOKEN_TRANSFER
+}
+
+enum TagVisibility {
+  PUBLIC
+  PRIVATE
 }
 
 model UserTable {
@@ -114,4 +120,20 @@ model TokenTransfer {
   table   UserTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@index([tableId])
+}
+
+model AddressTag {
+  id         Int           @id @default(autoincrement())
+  address    String // 区块链地址
+  content    String        @default("普通地址") // 标签内容（如：交易所、DEX等）
+  behavior   String // 标签行为（如：对敲、倾销等）
+  source     String // 信息来源（来自用户/AI/三方）
+  visibility TagVisibility @default(PUBLIC)
+  createdAt  DateTime      @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([address])
+  @@index([userId])
 }
