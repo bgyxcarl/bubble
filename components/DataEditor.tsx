@@ -120,6 +120,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   const [userTables, setUserTables] = useState<any[]>([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
 
+  // Table management state
+  const [editingTableId, setEditingTableId] = useState<string | null>(null);
+  const [newTableName, setNewTableName] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+
+
 
 
   const bgMain = theme === 'light' ? 'bg-white' : 'bg-[#1a1a1a]';
@@ -549,6 +555,71 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
     }
   };
 
+  const handleDeleteTable = async (e: React.MouseEvent, tableId: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this table? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`/api/user-tables/${tableId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setUserTables(prev => prev.filter(t => t.id !== tableId));
+        if (activeTableId === tableId) {
+          setActiveTableId(null);
+          setIsDbLoaded(false);
+        }
+      } else {
+        const data = await res.json();
+        alert(`Failed to delete table: ${data.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error deleting table');
+    }
+  };
+
+  const handleStartRenameTable = (e: React.MouseEvent, table: any) => {
+    e.stopPropagation();
+    setEditingTableId(table.id);
+    setNewTableName(table.name);
+  };
+
+  const handleCancelRenameTable = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingTableId(null);
+    setNewTableName('');
+  };
+
+  const handleRenameTable = async (e: React.MouseEvent, tableId: string) => {
+    e.stopPropagation();
+    if (!newTableName.trim()) return;
+
+    setIsRenaming(true);
+    try {
+      const res = await fetch(`/api/user-tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTableName })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setUserTables(prev => prev.map(t => t.id === tableId ? { ...t, name: updated.name } : t));
+        setEditingTableId(null);
+      } else {
+        const data = await res.json();
+        alert(`Failed to rename table: ${data.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error renaming table');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+
   const truncate = (str: string, len = 14) => {
     if (str.length < len) return str;
     return `${str.slice(0, 6)}...${str.slice(-6)}`;
@@ -677,7 +748,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           <div className="flex gap-2">
             {session && (
               <>
-                <button onClick={handleLoadTableList} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><CloudDownload size={16} /> <span className="hidden lg:inline">Load</span></button>
+                <button onClick={handleLoadTableList} className={`flex items-center gap-2 ${bgMain} ${textMain} px-3 py-2 font-bold border-2 ${borderMain} hover:bg-gray-100/10 neo-shadow-hover transition-transform`}><CloudDownload size={16} /> <span className="hidden lg:inline">My Tables</span></button>
                 <button
                   onClick={() => setShowSaveModal(true)}
                   disabled={isDbLoaded}
@@ -1037,7 +1108,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                 <button onClick={() => setShowLoadModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black"><X size={20} /></button>
                 <h2 className="text-xl font-black uppercase mb-4 flex items-center gap-2 shrink-0">
                   <CloudDownload size={24} className="text-blue-600" />
-                  Load Saved Table
+                  My Tables
                 </h2>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
@@ -1050,19 +1121,55 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
                       {userTables.map(table => (
                         <div key={table.id} className={`p-4 border-2 ${borderMain} hover:bg-gray-100/50 transition-colors cursor-pointer group relative`} onClick={() => handleImportTable(table.id)}>
                           <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-bold text-lg">{table.name}</h3>
-                            <span className={`text-[10px] font-black px-1.5 py-0.5 border border-current rounded uppercase ${table.type === 'TRANSACTION' ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-purple-600 border-purple-200 bg-purple-50'}`}>
+                            {editingTableId === table.id ? (
+                              <div className="flex-1 flex gap-2" onClick={e => e.stopPropagation()}>
+                                <input
+                                  autoFocus
+                                  value={newTableName}
+                                  onChange={e => setNewTableName(e.target.value)}
+                                  className={`flex-1 ${inputBg} border-2 border-blue-500 p-1 text-sm font-bold focus:outline-none`}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleRenameTable(e as any, table.id);
+                                    if (e.key === 'Escape') handleCancelRenameTable(e as any);
+                                  }}
+                                />
+                                <button onClick={e => handleRenameTable(e, table.id)} disabled={isRenaming} className="text-green-600 hover:scale-110 transition-transform"><Save size={16} /></button>
+                                <button onClick={handleCancelRenameTable} className="text-red-500 hover:scale-110 transition-transform"><X size={16} /></button>
+                              </div>
+                            ) : (
+                              <h3 className="font-bold text-lg truncate pr-16">{table.name}</h3>
+                            )}
+                            <span className={`text-[10px] font-black px-1.5 py-0.5 border border-current rounded uppercase shrink-0 ${table.type === 'TRANSACTION' ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-purple-600 border-purple-200 bg-purple-50'}`}>
                               {table.type === 'TRANSACTION' ? 'Native' : 'ERC20'}
                             </span>
                           </div>
                           <div className="text-xs text-gray-500 font-mono mb-2">
                             {new Date(table.createdAt).toLocaleDateString()}
                           </div>
-                          <div className="flex gap-3 text-xs font-bold text-gray-400 group-hover:text-black transition-colors">
-                            <span>{table._count.transactions + table._count.tokenTransfers} Rows</span>
+                          <div className="flex justify-between items-center">
+                            <div className="flex gap-3 text-xs font-bold text-gray-400 group-hover:text-black transition-colors">
+                              <span>{table._count.transactions + table._count.tokenTransfers} Rows</span>
+                            </div>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={e => handleStartRenameTable(e, table)}
+                                className="p-1 hover:bg-blue-100 text-blue-600 border border-transparent hover:border-blue-200 transition-all"
+                                title="Rename Table"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={e => handleDeleteTable(e, table.id)}
+                                className="p-1 hover:bg-red-100 text-red-600 border border-transparent hover:border-red-200 transition-all"
+                                title="Delete Table"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
+
                     </div>
                   )}
                 </div>

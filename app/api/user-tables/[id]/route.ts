@@ -98,3 +98,51 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: "Failed to delete table" }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: tableId } = await params;
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any).id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = (session.user as any).id;
+
+  try {
+    const body = await req.json();
+    const { name } = body;
+
+    if (!name || typeof name !== 'string') {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    const table = await prisma.userTable.findUnique({
+      where: { id: tableId },
+    });
+
+    if (!table || table.userId !== userId) {
+      return NextResponse.json({ error: "Table not found" }, { status: 404 });
+    }
+
+    // Check if new name already exists for this user
+    const existing = await prisma.userTable.findFirst({
+      where: { userId, name, id: { not: tableId } }
+    });
+
+    if (existing) {
+      return NextResponse.json({ error: "Table name already exists" }, { status: 409 });
+    }
+
+    const updatedTable = await prisma.userTable.update({
+      where: { id: tableId },
+      data: { name }
+    });
+
+    return NextResponse.json(updatedTable);
+
+  } catch (error) {
+    console.error("Failed to rename table:", error);
+    return NextResponse.json({ error: "Failed to rename table" }, { status: 500 });
+  }
+}
+
