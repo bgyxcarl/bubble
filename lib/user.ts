@@ -1,6 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { generateUserId } from "./utils";
+import { Prisma } from "@/prisma/generated/prisma/client";
 
 export const getUserByEmail = async (email: string) => {
   try {

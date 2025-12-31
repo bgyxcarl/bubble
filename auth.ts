@@ -3,7 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { generateUserId } from "./lib/utils";
 import { createUserWithCustomId } from "./lib/user";
 
 declare module "next-auth" {
