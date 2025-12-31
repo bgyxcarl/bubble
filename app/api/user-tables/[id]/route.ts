@@ -5,14 +5,14 @@ import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { TableType } from "@prisma/client";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: tableId } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any).id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const userId = (session.user as any).id;
-  const tableId = params.id;
 
   try {
     const table = await prisma.userTable.findUnique({
@@ -69,14 +69,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: tableId } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any).id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const userId = (session.user as any).id;
-  const tableId = params.id;
 
   try {
     const table = await prisma.userTable.findUnique({
