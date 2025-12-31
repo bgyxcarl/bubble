@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SUPPORTED_CHAINS } from '@/lib/constants';
 import { useSession } from 'next-auth/react';
 import SmartCsvImporter from './SmartCsvImporter';
+import { toast } from 'sonner';
+import ConfirmDialog from './ConfirmDialog';
 
 const MotionDiv = motion.div as any;
 const MotionTr = motion.tr as any;
@@ -124,6 +126,15 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [newTableName, setNewTableName] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+
+  // Deletion Dialog State
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    id: string;
+    mode: 'row' | 'table';
+    tableId?: string;
+    type?: TxType;
+  }>({ isOpen: false, id: '', mode: 'row' });
 
 
 
@@ -314,8 +325,35 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
     }
   };
 
-  const handleDelete = async (id: string, tableId?: string, type?: TxType) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+  const handleDelete = (id: string, tableId?: string, type?: TxType) => {
+    setDeleteConfirm({ isOpen: true, id, tableId, type, mode: 'row' });
+  };
+
+  const executeDelete = async () => {
+    const { id, tableId, type, mode } = deleteConfirm;
+
+    if (mode === 'table') {
+      try {
+        const res = await fetch(`/api/user-tables/${id}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          setUserTables(prev => prev.filter(t => t.id !== id));
+          if (activeTableId === id) {
+            setActiveTableId(null);
+            setIsDbLoaded(false);
+          }
+          toast.success("Table deleted successfully");
+        } else {
+          const data = await res.json();
+          toast.error(`Failed to delete table: ${data.error}`);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error('Error deleting table');
+      }
+      return;
+    }
 
     if (tableId && type) {
       try {
@@ -323,12 +361,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           method: 'DELETE'
         });
         if (!res.ok) {
-          alert('Failed to delete from database');
+          toast.error('Failed to delete from database');
           return;
         }
       } catch (e) {
         console.error(e);
-        alert('Error deleting row');
+        toast.error('Error deleting row');
         return;
       }
     }
@@ -340,6 +378,7 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
       setSelectedIds(newSet);
     }
     setIsDbLoaded(false);
+    toast.success("Row deleted successfully");
   };
 
   const handleAddRow = () => {
@@ -547,36 +586,17 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
           setActiveType(result.type as TxType);
         }
       } else {
-        alert('Failed to load table data.');
+        toast.error('Failed to load table data.');
       }
     } catch (error) {
       console.error(error);
-      alert('Error loading table.');
+      toast.error('Error loading table.');
     }
   };
 
   const handleDeleteTable = async (e: React.MouseEvent, tableId: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this table? This cannot be undone.')) return;
-
-    try {
-      const res = await fetch(`/api/user-tables/${tableId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        setUserTables(prev => prev.filter(t => t.id !== tableId));
-        if (activeTableId === tableId) {
-          setActiveTableId(null);
-          setIsDbLoaded(false);
-        }
-      } else {
-        const data = await res.json();
-        alert(`Failed to delete table: ${data.error}`);
-      }
-    } catch (error) {
-      console.error(error);
-      alert('Error deleting table');
-    }
+    setDeleteConfirm({ isOpen: true, id: tableId, mode: 'table' });
   };
 
   const handleStartRenameTable = (e: React.MouseEvent, table: any) => {
@@ -607,13 +627,14 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         const updated = await res.json();
         setUserTables(prev => prev.map(t => t.id === tableId ? { ...t, name: updated.name } : t));
         setEditingTableId(null);
+        toast.success("Table renamed successfully");
       } else {
         const data = await res.json();
-        alert(`Failed to rename table: ${data.error}`);
+        toast.error(`Failed to rename table: ${data.error}`);
       }
     } catch (error) {
       console.error(error);
-      alert('Error renaming table');
+      toast.error('Error renaming table');
     } finally {
       setIsRenaming(false);
     }
@@ -1177,6 +1198,16 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             </MotionDiv>
           )}
         </AnimatePresence>, document.body)}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={executeDelete}
+        title={deleteConfirm.mode === 'table' ? 'Delete Table' : 'Delete Row'}
+        description={deleteConfirm.mode === 'table'
+          ? 'Are you sure you want to delete this table? This will permanently remove all associated data and cannot be undone.'
+          : 'Are you sure you want to delete this row? This action cannot be undone.'}
+      />
     </div>
   );
 };
