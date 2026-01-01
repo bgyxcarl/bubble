@@ -276,12 +276,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             body: JSON.stringify(finalRow)
           });
           if (!res.ok) {
-            alert('Failed to update row in database');
+            toast.error('Failed to update row in database');
             return;
           }
         } catch (e) {
           console.error(e);
-          alert('Error updating row');
+          toast.error('Error updating row');
           return;
         }
       } else if (activeTableId) {
@@ -297,12 +297,12 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
             finalRow.id = result.id;
             finalRow.tableId = result.tableId;
           } else {
-            alert('Failed to create row in database: ' + result.error);
+            toast.error('Failed to create row in database: ' + result.error);
             return;
           }
         } catch (e) {
           console.error(e);
-          alert('Error creating row');
+          toast.error('Error creating row');
           return;
         }
       }
@@ -518,10 +518,11 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   };
 
   const handleSaveTable = async () => {
-    const dataToSave = data.filter(d => d.type === activeType);
+    // We now save ALL data, not just activeType
+    const dataToSave = data;
 
     if (dataToSave.length === 0) {
-      alert(`No ${activeType === 'native' ? 'Transaction' : 'Token Transfer'} data to save.`);
+      toast.warning(`No data to save.`);
       return;
     }
 
@@ -531,19 +532,19 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
       const response = await fetch('/api/user-tables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: saveTableName, type: activeType, data: dataToSave })
+        body: JSON.stringify({ name: saveTableName, data: dataToSave })
       });
       const result = await response.json();
       if (response.ok) {
         setShowSaveModal(false);
         setSaveTableName('');
-        alert('Table saved successfully!');
+        toast.success('Table saved successfully!');
       } else {
-        alert(`Error: ${result.error}`);
+        toast.error(`Error: ${result.error}`);
       }
     } catch (error) {
       console.error(error);
-      alert('Failed to save table.');
+      toast.error('Failed to save table.');
     } finally {
       setIsSaving(false);
     }
@@ -582,8 +583,15 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         setIsDbLoaded(true);
         setActiveTableId(result.id);
         setShowLoadModal(false);
-        if (result.type !== activeType) {
-          setActiveType(result.type as TxType);
+        // Map Prisma Enum to frontend TxType
+        // Map Prisma Enum to frontend TxType
+        const mappedType = result.type === 'TRANSACTION' ? 'native' :
+          result.type === 'TOKEN_TRANSFER' ? 'erc20' :
+            result.type === 'MIXED' ? 'native' : // Default to native for mixed
+              'native'; // Fallback
+
+        if (mappedType !== activeType) {
+          setActiveType(mappedType);
         }
       } else {
         toast.error('Failed to load table data.');

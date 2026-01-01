@@ -61,6 +61,7 @@ model VerificationToken {
 enum TableType {
   TRANSACTION
   TOKEN_TRANSFER
+  MIXED
 }
 
 enum TagVisibility {

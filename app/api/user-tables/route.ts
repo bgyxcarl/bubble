@@ -44,24 +44,26 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { name, type, data } = body; // type: 'native' | 'erc20'
+    const { name, data } = body;
+    // We infer type from data content now, but client might still send 'type'
+    // Actually best to ignore client 'type' or use it as hint, but 'data' is truth.
 
-    if (!name || !type || !data || !Array.isArray(data)) {
+    if (!name || !data || !Array.isArray(data)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
     const userId = (session.user as any).id;
 
-    // Validate that the user actually exists given the foreign key constraint
-    // const userExists = await prisma.user.findUnique({
-    //   where: { id: userId }
-    // });
+    // Determine Table Type
+    const hasNative = data.some((d: any) => d.type === 'native');
+    const hasErc20 = data.some((d: any) => d.type === 'erc20');
 
-    // if (!userExists) {
-    //   return NextResponse.json({ error: "User not found. Please re-login." }, { status: 401 });
-    // }
-
-    const tableType = type === 'native' ? TableType.TRANSACTION : TableType.TOKEN_TRANSFER;
+    let tableType: TableType = TableType.TRANSACTION;
+    if (hasNative && hasErc20) {
+      tableType = TableType.MIXED;
+    } else if (hasErc20) {
+      tableType = TableType.TOKEN_TRANSFER;
+    }
 
     // Check if table name exists for user
     const existing = await prisma.userTable.findFirst({
@@ -81,32 +83,36 @@ export async function POST(req: Request) {
     });
 
     // Batch Insert Data
-    if (tableType === TableType.TRANSACTION) {
-      const rows = data.map((d: any) => ({
-        tableId: table.id,
-        hash: d.hash,
-        method: d.method,
-        block: Number(d.block),
-        time: new Date(d.timestamp),
-        from: d.from,
-        to: d.to,
-        amount: Number(d.value) || 0,
-        txnFee: Number(d.fee) || 0,
-      }));
-      await prisma.transaction.createMany({ data: rows });
-    } else {
-      const rows = data.map((d: any) => ({
-        tableId: table.id,
-        hash: d.hash,
-        method: d.method,
-        block: Number(d.block),
-        time: new Date(d.timestamp),
-        from: d.from,
-        to: d.to,
-        amount: Number(d.value) || 0,
-        token: d.token || 'TOKEN',
-      }));
-      await prisma.tokenTransfer.createMany({ data: rows });
+    const nativeRows = data.filter((d: any) => d.type === 'native').map((d: any) => ({
+      tableId: table.id,
+      hash: d.hash,
+      method: d.method,
+      block: Number(d.block),
+      time: new Date(d.timestamp),
+      from: d.from,
+      to: d.to,
+      amount: Number(d.value) || 0,
+      txnFee: Number(d.fee) || 0,
+    }));
+
+    if (nativeRows.length > 0) {
+      await prisma.transaction.createMany({ data: nativeRows });
+    }
+
+    const erc20Rows = data.filter((d: any) => d.type === 'erc20').map((d: any) => ({
+      tableId: table.id,
+      hash: d.hash,
+      method: d.method,
+      block: Number(d.block),
+      time: new Date(d.timestamp),
+      from: d.from,
+      to: d.to,
+      amount: Number(d.value) || 0,
+      token: d.token || 'TOKEN',
+    }));
+
+    if (erc20Rows.length > 0) {
+      await prisma.tokenTransfer.createMany({ data: erc20Rows });
     }
 
     return NextResponse.json({ success: true, tableId: table.id });

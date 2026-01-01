@@ -24,7 +24,42 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     let data = [];
-    if (table.type === TableType.TRANSACTION) {
+    if (table.type === 'MIXED') {
+      const txns = await prisma.transaction.findMany({ where: { tableId } });
+      const transfers = await prisma.tokenTransfer.findMany({ where: { tableId } });
+
+      const mappedTxns = txns.map(t => ({
+        id: t.id,
+        hash: t.hash,
+        method: t.method,
+        block: t.block,
+        timestamp: t.time.toISOString(),
+        from: t.from,
+        to: t.to,
+        value: t.amount,
+        fee: t.txnFee,
+        type: 'native',
+        status: 'success',
+        tableId: t.tableId
+      }));
+
+      const mappedTransfers = transfers.map(t => ({
+        id: t.id,
+        hash: t.hash,
+        method: t.method,
+        block: t.block,
+        timestamp: t.time.toISOString(),
+        from: t.from,
+        to: t.to,
+        value: t.amount,
+        token: t.token,
+        type: 'erc20',
+        status: 'success',
+        tableId: t.tableId
+      }));
+
+      data = [...mappedTxns, ...mappedTransfers];
+    } else if (table.type === 'TRANSACTION') {
       const txns = await prisma.transaction.findMany({ where: { tableId } });
       data = txns.map(t => ({
         id: t.id,
