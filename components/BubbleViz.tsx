@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useSession } from "next-auth/react";
 import * as d3 from 'd3';
 import { Transaction, AddressNode, TxType } from '../types';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Search, X, ArrowUpRight, ArrowDownLeft, Filter, List, Activity, Coins, CheckSquare, Square, Users, Check, Copy, Waypoints, Calendar, Loader2, Layers, Network, ChevronRight, MousePointer2, RefreshCcw, ShieldCheck, Target, ArrowRight, Share2, GitMerge, GitBranch, Trash2 } from 'lucide-react';
+import { Search, X, ArrowUpRight, ArrowDownLeft, Filter, List, Activity, Coins, CheckSquare, Square, Users, Check, Copy, Waypoints, Calendar, Loader2, Layers, Network, ChevronRight, MousePointer2, RefreshCcw, ShieldCheck, Target, ArrowRight, Share2, GitMerge, GitBranch, Trash2, Tag, Plus, Pencil } from 'lucide-react';
 import { SUPPORTED_CHAINS } from '@/lib/constants';
 import { toast } from 'sonner';
 
@@ -113,6 +114,42 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
   const textSub = theme === 'light' ? 'text-gray-500' : 'text-gray-400';
   const gridColor = theme === 'light' ? '#e2e8f0' : '#333333';
   const linkColor = theme === 'light' ? '#52525b' : '#a1a1aa';
+
+
+  const { data: session } = useSession();
+
+  // Address Tagging State
+  const [nodeTags, setNodeTags] = useState<any[]>([]);
+  const [newTagContent, setNewTagContent] = useState('普通地址');
+  const [newTagBehavior, setNewTagBehavior] = useState('');
+  const [newTagVisibility, setNewTagVisibility] = useState('PUBLIC');
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [editingTagId, setEditingTagId] = useState<number | null>(null);
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [addressTagMap, setAddressTagMap] = useState<Map<string, Set<string>>>(new Map());
+
+  // Fetch all tags on mount
+  useEffect(() => {
+    fetch('/api/address-tags')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map = new Map<string, Set<string>>();
+          data.forEach((tag: any) => {
+            const addr = tag.address.toLowerCase();
+            if (!map.has(addr)) {
+              map.set(addr, new Set());
+            }
+            if (tag.behavior) {
+              map.get(addr)!.add(tag.behavior);
+            }
+          });
+          setAddressTagMap(map);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const availableTokens = useMemo(() => {
     const tokens = new Set<string>();
@@ -410,6 +447,103 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
     });
   };
 
+  // Tagging Logic
+  useEffect(() => {
+    if (selectedNode) {
+      setNodeTags([]);
+      setNewTagContent('普通地址');
+      setNewTagBehavior('');
+      setNewTagVisibility('PUBLIC');
+      setIsAddingTag(false);
+      setEditingTagId(null);
+      setIsLoadingTags(true);
+
+      fetch(`/api/address-tags?address=${selectedNode.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setNodeTags(data);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingTags(false));
+    }
+  }, [selectedNode]);
+
+  const handleDeleteTag = async (tagId: number) => {
+    if (!confirm("Are you sure you want to delete this tag?")) return;
+    try {
+      const res = await fetch(`/api/address-tags?id=${tagId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setNodeTags(prev => prev.filter(t => t.id !== tagId));
+        // Update map (optimistic remove)
+        setAddressTagMap(prev => {
+          const newMap = new Map(prev);
+          const tag = nodeTags.find(t => t.id === tagId);
+          if (tag) {
+            const addr = tag.address.toLowerCase();
+            if (newMap.has(addr)) {
+              newMap.get(addr)!.delete(tag.behavior);
+              if (newMap.get(addr)!.size === 0) newMap.delete(addr);
+            }
+          }
+          return newMap;
+        });
+        toast.success("Tag deleted");
+      } else {
+        toast.error("Failed to delete tag");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error deleting tag");
+    }
+  };
+
+  const handleStartEdit = (tag: any) => {
+    setNewTagContent(tag.content);
+    setNewTagBehavior(tag.behavior);
+    setNewTagVisibility(tag.visibility);
+    setEditingTagId(tag.id);
+    setIsAddingTag(true);
+  };
+
+  const handleSaveTag = async () => {
+    if (!selectedNode || !newTagBehavior.trim()) return;
+    setIsSavingTag(true);
+    try {
+      const res = await fetch('/api/address-tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: selectedNode.id,
+          content: newTagContent,
+          behavior: newTagBehavior,
+          visibility: newTagVisibility
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNodeTags(prev => [data, ...prev]);
+        setAddressTagMap(prev => {
+          const newMap = new Map(prev);
+          const addr = selectedNode.id.toLowerCase();
+          if (!newMap.has(addr)) newMap.set(addr, new Set());
+          newMap.get(addr)!.add(newTagBehavior);
+          return newMap;
+        });
+        setNewTagBehavior('');
+        setNewTagVisibility('PUBLIC');
+        setIsAddingTag(false);
+        toast.success("Tag added successfully");
+      } else {
+        toast.error("Failed to add tag", { description: data.error });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error adding tag");
+    } finally {
+      setIsSavingTag(false);
+    }
+  };
+
   const handleTraceExecution = async () => {
     if (traceTargets.size === 0) {
       toast.error("Selection Required", {
@@ -684,7 +818,13 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
         }
       })
       .on("mouseout", function (event: any, d: any) {
-        d3Any.select(this).select("text.label").transition().duration(200).style("opacity", 1).style("font-size", "9px").attr("fill", "white");
+        d3Any.select(this).select("text.label")
+          .transition().duration(200)
+          .style("opacity", 1)
+          .style("font-size", "9px")
+          .attr("fill", "white");
+        // No need to set text here as it resets style, but let's ensure it doesn't get messed up if mouseover changed it (mouseover didn't change text content, only size)
+
         if (d.fx === null) d3Any.select(this).select("circle.node-circle").attr("stroke", theme === 'light' ? "#fff" : "#000").attr("stroke-width", 2);
         if (tooltipRef.current) d3Any.select(tooltipRef.current).style("opacity", 0);
       });
@@ -739,7 +879,22 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
         g.append("path").attr("d", "M-2.5 -1 h5 v3.5 h-5 z M -1.5 -1 v-1.5 a 1.5 1.5 0 0 1 3 0 v 1.5").attr("fill", "white");
       });
 
-    node.append("text").attr("class", "label").text((d: any) => truncate(d.id)).attr("text-anchor", "middle").attr("dy", ".35em").attr("fill", "white").attr("font-size", "9px").attr("font-weight", "bold").attr("pointer-events", "none");
+    // Label Rendering w/ Tag Support
+    node.append("text")
+      .attr("class", "label")
+      .text((d: any) => {
+        const tags = addressTagMap.get(d.id.toLowerCase());
+        if (tags && tags.size > 0) {
+          return Array.from(tags).slice(0, 3).join(' | '); // Limit to 3 tags
+        }
+        return truncate(d.id);
+      })
+      .attr("text-anchor", "middle")
+      .attr("dy", ".35em")
+      .attr("fill", "white")
+      .attr("font-size", "9px")
+      .attr("font-weight", "bold")
+      .attr("pointer-events", "none");
 
     simulation.on("tick", () => {
       linkPath.attr("d", (d: any) => {
@@ -777,7 +932,7 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
     });
 
     return () => simulation.stop();
-  }, [nodes, links, radiusScale, theme, linkColor, baseAddresses]);
+  }, [nodes, links, radiusScale, theme, linkColor, baseAddresses, addressTagMap]);
 
   // Selected Stats
   const selectedStats = useMemo(() => {
@@ -1185,7 +1340,140 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
               </div>
               <button onClick={() => setSelectedNode(null)} className="hover:rotate-90 transition-transform ml-4 text-white mix-blend-difference"><X size={24} /></button>
             </div>
+
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+              {/* Tagging Section */}
+              <div className={`p-4 border-2 ${panelBorder} ${theme === 'light' ? 'bg-white' : 'bg-gray-900'}`}>
+                <h3 className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-3 flex items-center gap-2">
+                  <Tag size={12} /> Address Tags
+                </h3>
+
+                {/* Tag List */}
+                <div className="space-y-2 mb-4">
+                  {isLoadingTags ? (
+                    <div className="flex justify-center p-4">
+                      <Loader2 size={16} className="animate-spin text-gray-400" />
+                    </div>
+                  ) : nodeTags.length === 0 ? (
+                    <p className="text-[10px] text-gray-400 italic">No tags yet.</p>
+                  ) : (
+                    nodeTags.map(tag => (
+                      <div key={tag.id} className={`p-2 border ${theme === 'light' ? 'bg-gray-50 border-gray-100 hover:border-gray-200' : 'bg-black border-gray-800 hover:border-gray-700'} text-xs group relative transition-colors`}>
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200 text-gray-600' : 'bg-gray-800 text-gray-400'}`}>
+                                {tag.content}
+                              </span>
+                              {tag.visibility === 'PRIVATE' && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-amber-900/50 text-amber-400'}`}>
+                                  PRIVATE
+                                </span>
+                              )}
+                            </div>
+                            <div className={`text-xs font-semibold break-words leading-tight ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>
+                              {tag.behavior}
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-1">
+                            {/* Actions overlay/inline */}
+                            {session?.user && (session.user as any).id === tag.userId && (
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 bg-inherit pl-2">
+                                <button onClick={() => handleStartEdit(tag)} className="p-1 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded" title="Edit">
+                                  <Pencil size={11} />
+                                </button>
+                                <button onClick={() => handleDeleteTag(tag.id)} className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded" title="Delete">
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Tag Form */}
+                <div className="space-y-2 pt-2 border-t border-dashed border-gray-300 dark:border-gray-700">
+                  {!isAddingTag ? (
+                    <button
+                      onClick={() => {
+                        setNewTagContent('普通地址');
+                        setNewTagBehavior('');
+                        setNewTagVisibility('PUBLIC');
+                        setEditingTagId(null);
+                        setIsAddingTag(true);
+                      }}
+                      className="w-full py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all flex items-center justify-center gap-2 rounded"
+                    >
+                      <Plus size={12} /> Add Tag
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-1">
+                          <label className="text-[9px] font-bold uppercase text-gray-400 block mb-1">Content</label>
+                          <input
+                            value={newTagContent}
+                            onChange={e => setNewTagContent(e.target.value)}
+                            placeholder="普通地址"
+                            className={`w-full p-1.5 text-xs border ${panelBorder} ${theme === 'light' ? 'bg-gray-50' : 'bg-black'} focus:outline-none focus:border-blue-500`}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[9px] font-bold uppercase text-gray-400 block mb-1">Behavior</label>
+                          <input
+                            value={newTagBehavior}
+                            onChange={e => setNewTagBehavior(e.target.value)}
+                            placeholder="e.g. Dumping, Arbitrage..."
+                            className={`w-full p-1.5 text-xs border ${panelBorder} ${theme === 'light' ? 'bg-gray-50' : 'bg-black'} focus:outline-none focus:border-blue-500`}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <label className="text-[9px] font-bold uppercase text-gray-400 block mb-1">Visibility</label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setNewTagVisibility('PUBLIC')}
+                              className={`flex-1 py-1 text-[10px] font-bold uppercase border ${newTagVisibility === 'PUBLIC' ? 'bg-blue-600 text-white border-blue-600' : `bg-transparent text-gray-500 border-gray-300 dark:border-gray-700`}`}
+                            >
+                              Public
+                            </button>
+                            <button
+                              onClick={() => setNewTagVisibility('PRIVATE')}
+                              className={`flex-1 py-1 text-[10px] font-bold uppercase border ${newTagVisibility === 'PRIVATE' ? 'bg-gray-600 text-white border-gray-600' : `bg-transparent text-gray-500 border-gray-300 dark:border-gray-700`}`}
+                            >
+                              Private
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setIsAddingTag(false);
+                            setEditingTagId(null);
+                          }}
+                          className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider bg-gray-200 hover:bg-gray-300 text-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors`}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveTag}
+                          disabled={isSavingTag || !newTagBehavior.trim()}
+                          className={`flex-1 py-1.5 text-xs font-black uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                        >
+                          {isSavingTag ? <Loader2 size={12} className="animate-spin" /> : editingTagId ? <Pencil size={12} /> : <Plus size={12} />}
+                          {editingTagId ? 'Update' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className={`p-4 border-2 ${panelBorder} ${theme === 'light' ? 'bg-blue-50' : 'bg-blue-900/20'}`}>
                   <div className="text-[10px] font-black uppercase text-blue-500 mb-1">Total Sent</div>
@@ -1226,7 +1514,7 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
           </MotionDiv>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };
 
