@@ -5,41 +5,28 @@ import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = session?.user ? (session.user as any).id : null;
 
   const { searchParams } = new URL(req.url);
   const address = searchParams.get("address");
 
-  if (!address) {
-    // Return all tags for the user if no specific address is requested
-    try {
-      const allTags = await prisma.addressTag.findMany({
-        where: {
-          OR: [
-            { visibility: 'PUBLIC' },
-            { userId: (session.user as any).id }
-          ]
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-      return NextResponse.json(allTags);
-    } catch (error) {
-      console.error("Failed to fetch all tags:", error);
-      return NextResponse.json({ error: "Failed to fetch tags" }, { status: 500 });
-    }
-  }
-
   try {
+    const where: any = {
+      OR: [
+        { visibility: 'PUBLIC' }
+      ]
+    };
+
+    if (userId) {
+      where.OR.push({ userId });
+    }
+
+    if (address) {
+      where.address = address.toLowerCase();
+    }
+
     const tags = await prisma.addressTag.findMany({
-      where: {
-        address: address.toLowerCase(),
-        OR: [
-          { visibility: 'PUBLIC' },
-          { userId: (session.user as any).id }
-        ]
-      },
+      where,
       orderBy: { createdAt: 'desc' }
     });
 
