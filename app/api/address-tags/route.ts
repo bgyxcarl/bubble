@@ -34,8 +34,11 @@ export async function GET(req: Request) {
   try {
     const tags = await prisma.addressTag.findMany({
       where: {
-        address: address.toLowerCase(), // Ensure consistency
-        userId: (session.user as any).id
+        address: address.toLowerCase(),
+        OR: [
+          { visibility: 'PUBLIC' },
+          { userId: (session.user as any).id }
+        ]
       },
       orderBy: { createdAt: 'desc' }
     });
