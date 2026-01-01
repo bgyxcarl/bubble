@@ -885,7 +885,7 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
       .text((d: any) => {
         const tags = addressTagMap.get(d.id.toLowerCase());
         if (tags && tags.size > 0) {
-          return Array.from(tags).slice(0, 3).join(' | '); // Limit to 3 tags
+          return Array.from(tags).join(' | ');
         }
         return truncate(d.id);
       })
