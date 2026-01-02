@@ -242,10 +242,10 @@ const SmartCsvImporter: React.FC<SmartCsvImporterProps> = ({
                   <div className="bg-green-500 text-white p-2 border-2 border-black"><CheckCircle2 size={24} /></div>
                   <h2 className="text-2xl font-black uppercase">Import Complete</h2>
                 </div>
-                <div className="bg-gray-100 dark:bg-gray-800 p-4 border-2 border-gray-300 dark:border-gray-700 font-mono text-sm whitespace-pre-line leading-relaxed">
+                <div className="bg-gray-100 dark:bg-gray-800 p-4 border-2 border-gray-300 dark:border-gray-700 font-mono text-sm whitespace-pre-line leading-relaxed text-gray-900 dark:text-gray-100">
                   {importResultMsg}
                 </div>
-                <button onClick={handleClose} className={`w-full py-3 font-black uppercase tracking-widest transition-colors ${theme === 'light' ? 'bg-black text-white hover:bg-gray-800' : 'bg-white text-black hover:bg-gray-200'}`}>
+                <button onClick={handleClose} className={`w-full py-3 font-black uppercase tracking-widest transition-colors ${theme === 'light' ? 'bg-black text-white hover:bg-gray-800' : 'bg-[#1a1a1a] text-white hover:bg-gray-800'}`}>
                   Done
                 </button>
               </div>

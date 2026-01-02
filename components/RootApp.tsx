@@ -56,7 +56,7 @@ const RootApp: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col overflow-hidden font-sans transition-colors duration-300 ${theme === 'light' ? 'bg-white text-black' : 'bg-black text-white'}`}>
+    <div className={`min-h-screen flex flex-col overflow-hidden font-sans transition-colors duration-300 ${theme === 'light' ? 'bg-white text-black' : 'bg-[#0a0a0a] text-white'}`}>
 
       {/* Header / Nav */}
       <header className={`border-b-4 ${borderClass} ${theme === 'light' ? 'bg-white' : 'bg-[#111]'} p-4 flex justify-between items-center z-50 relative`}>
