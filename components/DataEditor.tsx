@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Transaction, TxType } from '../types';
-import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target, Cloud, CloudDownload } from 'lucide-react';
+import { Edit2, Save, Plus, Trash2, Upload, FileJson, Table as TableIcon, Download, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Search, X, CheckCircle2, Network, Copy, CheckSquare, Square, ClipboardCheck, MoreHorizontal, CalendarClock, Target, Cloud, CloudDownload, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUPPORTED_CHAINS } from '@/lib/constants';
 import { useSession } from 'next-auth/react';
@@ -25,9 +25,15 @@ interface DataEditorProps {
 type SortKey = keyof Transaction;
 type SortDirection = 'asc' | 'desc';
 
-const InteractiveCell = ({ value, label, truncateLen = 14, theme }: { value: string, label: string, truncateLen?: number, theme: 'light' | 'dark' }) => {
+const InteractiveCell = ({ value, label, truncateLen = 14, theme, tags }: { value: string, label: string, truncateLen?: number, theme: 'light' | 'dark', tags?: string[] }) => {
   const [showFull, setShowFull] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Prioritize showing tags over address
+  const tagDisplay = tags && tags.length > 0 ? tags.join(' / ') : null;
+  const displayValue = (label === 'From' || label === 'To') && tagDisplay ? tagDisplay : value;
+
+  const truncated = displayValue && displayValue.length > truncateLen && !tagDisplay ? `${displayValue.slice(0, 6)}...${displayValue.slice(-6)}` : displayValue;
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -38,15 +44,14 @@ const InteractiveCell = ({ value, label, truncateLen = 14, theme }: { value: str
     }
   };
 
-  const truncated = value && value.length > truncateLen ? `${value.slice(0, 6)}...${value.slice(-6)}` : value;
-
   return (
     <div
       className="relative group inline-block"
       onMouseEnter={() => setShowFull(true)}
       onMouseLeave={() => setShowFull(false)}
     >
-      <span className={`cursor-pointer ${theme === 'light' ? 'text-blue-600 hover:text-blue-800' : 'text-blue-400 hover:text-blue-300'} font-medium`}>
+      <span className={`cursor-pointer ${theme === 'light' ? 'text-blue-600 hover:text-blue-800' : 'text-blue-400 hover:text-blue-300'} font-medium ${tagDisplay ? 'flex items-center gap-1 font-bold' : ''}`}>
+        {tagDisplay && <Tag size={12} className="shrink-0" />}
         {truncated}
       </span>
 
@@ -62,6 +67,15 @@ const InteractiveCell = ({ value, label, truncateLen = 14, theme }: { value: str
               <span>{value}</span>
               {copied ? <CheckCircle2 size={12} className="text-green-600" /> : <Copy size={12} className="opacity-50" />}
             </div>
+            {tags && tags.length > 0 && (
+              <div className="mt-1 border-t border-black/10 pt-1">
+                {tags.map((t, i) => (
+                  <div key={i} className="text-[10px] opacity-70 flex items-center gap-1">
+                    <Tag size={8} /> {t}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className={`absolute bottom-[-6px] left-4 w-3 h-3 border-r-2 border-b-2 border-black transform rotate-45 ${theme === 'light' ? 'bg-yellow-100' : 'bg-gray-800'}`}></div>
           </MotionDiv>
         )}
@@ -135,6 +149,32 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
     tableId?: string;
     type?: TxType;
   }>({ isOpen: false, id: '', mode: 'row' });
+
+  // Address Tags State
+  const [addressTags, setAddressTags] = useState<Map<string, string[]>>(new Map());
+
+  useEffect(() => {
+    // Fetch tags
+    fetch('/api/address-tags')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map = new Map<string, string[]>();
+          data.forEach((tag: any) => {
+            const addr = tag.address.toLowerCase();
+            if (tag.behavior) {
+              const existing = map.get(addr) || [];
+              if (!existing.includes(tag.behavior)) {
+                existing.push(tag.behavior);
+              }
+              map.set(addr, existing);
+            }
+          });
+          setAddressTags(map);
+        }
+      })
+      .catch(err => console.error("Failed to fetch tags in DataEditor", err));
+  }, []);
 
 
 
@@ -420,10 +460,6 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
   const handleImportComplete = (newTxns: Transaction[], addedNative: number, addedErc20: number, reason: string) => {
     setData(prev => [...newTxns, ...prev]);
     setIsDbLoaded(false);
-    // Logic for success message is now handled inside SmartCsvImporter or we can show a toast here if needed.
-    // The modal closes itself or waits for user to close.
-    // In the old logic, it showed result message in step 3. 
-    // SmartCsvImporter handles step 3.
   };
 
   const handleAddBaseAddresses = (addresses: string[]) => {
@@ -583,7 +619,6 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
         setIsDbLoaded(true);
         setActiveTableId(result.id);
         setShowLoadModal(false);
-        // Map Prisma Enum to frontend TxType
         // Map Prisma Enum to frontend TxType
         const mappedType = result.type === 'TRANSACTION' ? 'native' :
           result.type === 'TOKEN_TRANSFER' ? 'erc20' :
@@ -930,13 +965,13 @@ const DataEditor: React.FC<DataEditorProps> = ({ data, setData, activeType, setA
 
                             <td className="p-4 relative">
                               <div className="flex items-center gap-2">
-                                <InteractiveCell value={row.from} label="From" theme={theme} />
+                                <InteractiveCell value={row.from} label="From" theme={theme} tags={addressTags.get(row.from.toLowerCase())} />
                                 {baseAddresses.has(row.from.toLowerCase()) && <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
                               </div>
                             </td>
                             <td className="p-4 relative">
                               <div className="flex items-center gap-2">
-                                <InteractiveCell value={row.to} label="To" theme={theme} />
+                                <InteractiveCell value={row.to} label="To" theme={theme} tags={addressTags.get(row.to.toLowerCase())} />
                                 {baseAddresses.has(row.to.toLowerCase()) && <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>}
                               </div>
                             </td>
