@@ -128,6 +128,7 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [addressTagMap, setAddressTagMap] = useState<Map<string, Set<string>>>(new Map());
+  const [allTagsCache, setAllTagsCache] = useState<Map<string, any[]>>(new Map());
 
   // Fetch all tags on mount
   useEffect(() => {
@@ -136,16 +137,26 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
       .then(data => {
         if (Array.isArray(data)) {
           const map = new Map<string, Set<string>>();
+          const cache = new Map<string, any[]>();
+
           data.forEach((tag: any) => {
             const addr = tag.address.toLowerCase();
+            // Update Map for Labels
             if (!map.has(addr)) {
               map.set(addr, new Set());
             }
             if (tag.behavior) {
               map.get(addr)!.add(tag.behavior);
             }
+
+            // Update Cache for detailed view
+            if (!cache.has(addr)) {
+              cache.set(addr, []);
+            }
+            cache.get(addr)!.push(tag);
           });
           setAddressTagMap(map);
+          setAllTagsCache(cache);
         }
       })
       .catch(console.error);
@@ -456,17 +467,19 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
       setNewTagVisibility('PUBLIC');
       setIsAddingTag(false);
       setEditingTagId(null);
-      setIsLoadingTags(true);
 
-      fetch(`/api/address-tags?address=${selectedNode.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setNodeTags(data);
-        })
-        .catch(console.error)
-        .finally(() => setIsLoadingTags(false));
+      const addr = selectedNode.id.toLowerCase();
+      if (allTagsCache.has(addr)) {
+        setNodeTags(allTagsCache.get(addr)!);
+        setIsLoadingTags(false);
+      } else {
+        // Fallback: If not in cache (maybe new node not in initial fetch?), dry run empty or fetch?
+        // Since we fetch ALL tags at start, if it's not in cache, it has no tags.
+        setNodeTags([]);
+        setIsLoadingTags(false);
+      }
     }
-  }, [selectedNode]);
+  }, [selectedNode, allTagsCache]);
 
   const handleDeleteTag = async (tagId: number) => {
     if (!confirm("Are you sure you want to delete this tag?")) return;
@@ -474,6 +487,25 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
       const res = await fetch(`/api/address-tags?id=${tagId}`, { method: 'DELETE' });
       if (res.ok) {
         setNodeTags(prev => prev.filter(t => t.id !== tagId));
+
+        // Update Cache
+        setAllTagsCache(prev => {
+          const newCache = new Map(prev);
+          const tag = nodeTags.find(t => t.id === tagId);
+          if (tag) {
+            const addr = tag.address.toLowerCase();
+            if (newCache.has(addr)) {
+              const updatedList = newCache.get(addr)!.filter(t => t.id !== tagId);
+              if (updatedList.length > 0) {
+                newCache.set(addr, updatedList);
+              } else {
+                newCache.delete(addr);
+              }
+            }
+          }
+          return newCache;
+        });
+
         // Update map (optimistic remove)
         setAddressTagMap(prev => {
           const newMap = new Map(prev);
@@ -481,8 +513,17 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
           if (tag) {
             const addr = tag.address.toLowerCase();
             if (newMap.has(addr)) {
-              newMap.get(addr)!.delete(tag.behavior);
-              if (newMap.get(addr)!.size === 0) newMap.delete(addr);
+              // Check if any other tag has same behavior
+              // We can check against the nodeTags (current UI state before delete actually, but here we already filtered setNodeTags? 
+              // Wait, setNodeTags is async state update. nodeTags here is still old value in closure? 
+              // React state closure: yes 'nodeTags' is from render scope.
+              // BUT we need to be careful. The 'tag' variable is found from 'nodeTags'. 
+
+              const otherHasBehavior = nodeTags.some(t => t.id !== tagId && t.behavior === tag.behavior && t.address.toLowerCase() === addr);
+              if (!otherHasBehavior) {
+                newMap.get(addr)!.delete(tag.behavior);
+                if (newMap.get(addr)!.size === 0) newMap.delete(addr);
+              }
             }
           }
           return newMap;
@@ -508,37 +549,89 @@ const BubbleViz: React.FC<BubbleVizProps> = ({ data, activeType, setActiveType, 
   const handleSaveTag = async () => {
     if (!selectedNode || !newTagBehavior.trim()) return;
     setIsSavingTag(true);
+
+    const isEdit = !!editingTagId;
+    const method = isEdit ? 'PATCH' : 'POST';
+    const body: any = {
+      content: newTagContent,
+      behavior: newTagBehavior,
+      visibility: newTagVisibility
+    };
+
+    if (isEdit) {
+      body.id = editingTagId;
+    } else {
+      body.address = selectedNode.id;
+    }
+
     try {
       const res = await fetch('/api/address-tags', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: selectedNode.id,
-          content: newTagContent,
-          behavior: newTagBehavior,
-          visibility: newTagVisibility
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
+
       if (res.ok) {
-        setNodeTags(prev => [data, ...prev]);
+        // Update tags list
+        setNodeTags(prev => {
+          if (isEdit) {
+            return prev.map(t => t.id === editingTagId ? data : t);
+          } else {
+            return [data, ...prev];
+          }
+        });
+
+        // Update Cache
+        setAllTagsCache(prev => {
+          const newCache = new Map(prev);
+          const addr = selectedNode.id.toLowerCase();
+          const currentList = newCache.get(addr) || [];
+
+          if (isEdit) {
+            newCache.set(addr, currentList.map(t => t.id === editingTagId ? data : t));
+          } else {
+            newCache.set(addr, [data, ...currentList]);
+          }
+          return newCache;
+        });
+
+        // Update map
         setAddressTagMap(prev => {
           const newMap = new Map(prev);
           const addr = selectedNode.id.toLowerCase();
+
+          if (isEdit) {
+            const oldTag = nodeTags.find(t => t.id === editingTagId);
+            if (oldTag && newMap.has(addr)) {
+              const otherHasBehavior = nodeTags.some(t => t.id !== editingTagId && t.behavior === oldTag.behavior && t.address.toLowerCase() === addr);
+              if (!otherHasBehavior) {
+                newMap.get(addr)!.delete(oldTag.behavior);
+              }
+            }
+          }
+
           if (!newMap.has(addr)) newMap.set(addr, new Set());
           newMap.get(addr)!.add(newTagBehavior);
+
+          if (newMap.has(addr) && newMap.get(addr)!.size === 0) {
+            newMap.delete(addr);
+          }
+
           return newMap;
         });
+
         setNewTagBehavior('');
         setNewTagVisibility('PUBLIC');
+        setEditingTagId(null);
         setIsAddingTag(false);
-        toast.success("Tag added successfully");
+        toast.success(isEdit ? "Tag updated successfully" : "Tag added successfully");
       } else {
-        toast.error("Failed to add tag", { description: data.error });
+        toast.error(isEdit ? "Failed to update tag" : "Failed to add tag", { description: data.error });
       }
     } catch (e) {
       console.error(e);
-      toast.error("Error adding tag");
+      toast.error(isEdit ? "Error updating tag" : "Error adding tag");
     } finally {
       setIsSavingTag(false);
     }
